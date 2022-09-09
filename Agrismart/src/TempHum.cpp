@@ -6,14 +6,17 @@
 #include "error.hpp"
 extern int ERROR;
 AHT10 myAHT10(AHT10_ADDRESS_0X38);
-bool turnOnTempHum(){
+bool turnOnTempHum(bool display_text){
    unsigned long start_time = millis();
-   while (myAHT10.begin() != true && millis() - start_time <= 5000)
+   while (myAHT10.begin() != true && millis() - start_time <= 3000)
    {
       // TempHum_error();
+      if (display_text){
+         printlnClearOLED(processText("Temperature/humidity sensor failed").c_str(), WHITE, 1);
+         delay(500);
+      }
    }
    if (myAHT10.begin() != true){
-      printlnClearOLED(processText("Fail to initialize AHT10 sensor").c_str(), WHITE, 1);
       Serial.println("AHT10 failed");
       return false;
    }
@@ -21,11 +24,21 @@ bool turnOnTempHum(){
    Serial.println("AHT10 OK");
    return true;
 }
-String getTemperature(){
-   String temperature = String(myAHT10.readTemperature(), 2);
-   return temperature;
+String getTemperature(bool AHT10_alive){
+   if (!AHT10_alive){
+      return "???";
+   } else {
+      String temperature = String(myAHT10.readTemperature(), 2);
+      return temperature;
+   }
+   
 }
-String getHumidity(){
-   String humidity = String(myAHT10.readHumidity(), 2);
-   return humidity;
+String getHumidity(bool AHT10_alive){
+   if (!AHT10_alive){
+      return "???";
+   } else {
+      String humidity = String(myAHT10.readHumidity(), 2);
+      return humidity;
+   }
+   
 }

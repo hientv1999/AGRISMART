@@ -4,8 +4,7 @@ int high_frequency = 1000;   //solid
 int low_frequency = 1;   //fast
 
 void OLED_error(){
-    ledcDetachPin(ERROR);
-    ledcSetup(0, high_frequency, 8);
+    ledcSetup(0, low_frequency, 8);
     ledcAttachPin(ERROR, 0);
     ledcWrite(0, 99);
     

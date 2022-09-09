@@ -12,16 +12,19 @@ extern int ERROR;
 #include <Wire.h>
 #include "error.hpp"
 VL53L0X waterLevelSensor;
-bool turnOnTOF(){
+bool turnOnTOF(bool display_text){
     waterLevelSensor.setBus(&Wire1);
     waterLevelSensor.setTimeout(500);
     unsigned long start_time = millis();
-    while (waterLevelSensor.init() != true && millis() - start_time <= 5000) {
+    while (waterLevelSensor.init() != true && millis() - start_time <= 3000) {
         // TOF_error();
+        if (display_text){
+            printlnClearOLED(processText("Fail to initialize VL53L0X sensor").c_str(), WHITE, 1);
+            delay(500);
+        }
     }
     // ledcDetachPin(ERROR);
     if (waterLevelSensor.init() != true){
-        printlnClearOLED(processText("Fail to initialize VL53L0X sensor").c_str(), WHITE, 1);
         Serial.println("VL53L0X failed");
         return false;
     }
@@ -29,9 +32,14 @@ bool turnOnTOF(){
     return true;
 }
 
-unsigned int waterLevelPercentage(){
-    waterLevelSensor.setMeasurementTimingBudget(200000);
-    return (waterLevelSensor.readRangeSingleMillimeters()-92)*100/WATER_LEVEL_MAX_MILIMETER;   // add the calibrated equation here
+String waterLevelPercentage(bool VL53L0X_alive){
+    if (!VL53L0X_alive){
+        return "???";
+    } else {
+        waterLevelSensor.setMeasurementTimingBudget(200000);
+        float waterPercentage = (waterLevelSensor.readRangeSingleMillimeters()-92)*100/WATER_LEVEL_MAX_MILIMETER;   // add the calibrated equation here
+        return String(waterPercentage, 2);
+    }
 }
 
 unsigned int soilMoisture(){

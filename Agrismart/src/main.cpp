@@ -20,8 +20,6 @@ const uint64_t TIME_TO_UPDATE_IN_SEC = 300; //time between uploading data to LAM
 int HAPTIC = 19;
 int BUTTON_OLED = 32;
 int ERROR = 33;
-int BATT_LEVEL = 34;
-int CHAR_CUR = 35;
 int  TOUCH = 13;
 bool toggleDisplay;
 uint16_t threshold_touch = 20;
@@ -52,7 +50,7 @@ uint64_t Update(String serverName, char sensorName[], char sensorLocation[]){
   uint64_t time_sleep_left = TIME_TO_UPDATE_IN_SEC - sinceLastUpdate;
   if (sinceLastUpdate >= TIME_TO_UPDATE_IN_SEC) { // if it is time to update-
     String dataName[NUM_OF_DATATYPE] = {"Temperature", "Humidity", "WaterLevel", "BatteryLevel", "ChargingCurrent", "Watering"};
-    String dataValue[NUM_OF_DATATYPE] = {getTemperature(), getHumidity(), String(waterLevelPercentage()), String(getBatteryLevel()), String(chargingCurrent()), "1"};
+    String dataValue[NUM_OF_DATATYPE] = {String(getTemperature(true)), String(getHumidity(true)), String(waterLevelPercentage(true)), String(getBatteryLevel()), String(chargingCurrent()), "1"};
     if (sendDataLAMP(serverName.c_str(), sensorName, sensorLocation, apiKeyValue, dataName, dataValue, NUM_OF_DATATYPE)){
         lastUpdate = getTime();
         time_sleep_left = TIME_TO_UPDATE_IN_SEC;
@@ -72,10 +70,6 @@ uint64_t Update(String serverName, char sensorName[], char sensorLocation[]){
 }
 
 
-float ReadVoltageAnalogPin(int pin){
-  return float(analogRead(pin))/4095*3.1+0.1;
-}
-
 void setup()
 {
   pinMode(HAPTIC, OUTPUT);
@@ -94,13 +88,15 @@ void setup()
   char sensorLocation[32] = {};
   long gmtOffset_sec = 0;
   String serverName = "";
+  bool AHT10_alive = false;
+  bool VL53L0X_alive = false;
   if (FirstSetup() == 0){                 // first time setup
     // turn on OLED, display welcome screen, turn on sensor, turn on BLE
     turnOnOLED();
-    turnOnTempHum();
-    turnOnTOF();
     turnOnBLE("Unnamed Agrismart");
     printWelcomeScreen();
+    AHT10_alive = turnOnTempHum();
+    VL53L0X_alive = turnOnTOF();
     if (setupOption(true)){
       //fast setup
       while (!fastSetup(ssid, pass, IP, sensorName, sensorLocation)){
@@ -136,15 +132,21 @@ void setup()
       gmtOffset_sec = askForOffset();
       saveOffset(gmtOffset_sec);
     }
+    printlnClearOLED("Finish Fast Setup", WHITE, 1);
+    delay(1000);
     saveSSID(ssid, strlen(ssid));
     savePassword(pass, strlen(pass));
     saveIP(IP, strlen(IP));
     saveSensorName(sensorName, strlen(sensorName));
     saveSensorLocation(sensorLocation, strlen(sensorLocation));
+    printlnClearOLED("Finish Saving", WHITE, 1);
+    delay(1000);
     // force device to update to server to obtain local timezone
     lastUpdate = getTime() - TIME_TO_UPDATE_IN_SEC;
     serverName = "http://" + String(IP) + "/user/gardening/Agrismart/post_data.php";
     turnOffBLE();
+    printlnClearOLED("BLE off", WHITE, 1);
+    delay(1000);
     turnOnWiFi(sensorName, true);
     printlnClearOLED("Setup done", WHITE, 1);
     unsigned int start_finish = millis();
@@ -157,9 +159,11 @@ void setup()
     case ESP_SLEEP_WAKEUP_TOUCHPAD : //touch pad
       {
         digitalWrite(HAPTIC, HIGH);
+        delay(10);
         digitalWrite(HAPTIC, LOW);
-        turnOnOLED();
-        if (turnOnTempHum() && turnOnTOF()){
+        if (turnOnOLED()){
+          AHT10_alive = turnOnTempHum();
+          VL53L0X_alive = turnOnTOF();
           strcpy(sensorName, retrieveSensorName().c_str());
           strcpy(IP, retrieveIP(sensorName).c_str());
           turnOnWiFi(sensorName, true);
@@ -175,19 +179,19 @@ void setup()
           while (millis() - lastPressOLED <= 15000){ //cycle through display mode
             switch (tap_num){
               case 0: //everything
-                displayOverview();
+                displayOverview(AHT10_alive, VL53L0X_alive);
               break;
 
               case 1: // big temp
-                displayTemperature(); 
+                displayTemperature(AHT10_alive); 
               break;
 
               case 2: // big hum
-                displayHumidity();
+                displayHumidity(AHT10_alive);
               break;
 
               case 3: // water level
-                displayWaterLevel();
+                displayWaterLevel(VL53L0X_alive);
               break;
 
               case 4: // batterry level
@@ -210,70 +214,72 @@ void setup()
               toggleDisplay = false;
               lastPressOLED = millis();
             }
-          }
-        } else {
-          delay(5000);
-        }       
-        Serial.println("End of screen");
-        turnOffOLED();
+          }    
+          Serial.println("End of screen");
+          turnOffOLED();
+        }
+        
       }
     break;
     
     case ESP_SLEEP_WAKEUP_TIMER : //timer
       strcpy(sensorName, retrieveSensorName().c_str());
       turnOnWiFi(sensorName, false);
-      //without below 3 lines, TempHum cannot be initialized
-      pinMode(BUTTON_OLED, OUTPUT);
-      digitalWrite(BUTTON_OLED, HIGH);
-      delay(100);
+      // //without below 3 lines, TempHum cannot be initialized
+      // pinMode(BUTTON_OLED, OUTPUT);
+      // digitalWrite(BUTTON_OLED, HIGH);
+      // delay(100);
       //turn sensors on
-      turnOnTempHum();
-      turnOnTOF();
+      AHT10_alive = turnOnTempHum(false);
+      VL53L0X_alive = turnOnTOF(false);
       strcpy(IP, retrieveIP(sensorName).c_str());
       strcpy(sensorLocation, retrieveSensorLocation(sensorName).c_str());
       serverName = "http://" + String(IP) + "/user/gardening/Agrismart/post_data.php";
-      
     break;
+
     default:  // wakeup by reset
-        turnOnOLED();
-        printWelcomeScreen();
-        strcpy(sensorName, retrieveSensorName().c_str());
-        turnOnWiFi(sensorName, true);
-        if (getTouchValue(TOUCH) < threshold_touch){
-          // factory reset code
-          unsigned int origin = millis();
-          bool factory_reset = true;
-          while (millis()- origin <= 1000){
-            if (getTouchValue(TOUCH) > threshold_touch){
-              factory_reset = false;
+        if (turnOnOLED()){
+          printWelcomeScreen();
+          strcpy(sensorName, retrieveSensorName().c_str());
+          turnOnWiFi(sensorName, true);
+          if (getTouchValue(TOUCH) < threshold_touch){
+            // factory reset code
+            unsigned int origin = millis();
+            bool factory_reset = true;
+            while (millis()- origin <= 1000){
+              if (getTouchValue(TOUCH) > threshold_touch){
+                factory_reset = false;
+              }
             }
-          }
-          if (factory_reset){
-            strcpy(IP, retrieveIP(sensorName).c_str());
-            strcpy(sensorLocation, retrieveSensorLocation(sensorName).c_str());
-            serverName = "http://" + String(IP) + "/user/gardening/Agrismart/deleteTable.php";
-            if (deleteTable(serverName, sensorName, sensorLocation)){
-              factoryReset(false);
-            } else {
-              if (ManualFactoryReset()){
-                factoryReset(true);
+            if (factory_reset){
+              strcpy(IP, retrieveIP(sensorName).c_str());
+              strcpy(sensorLocation, retrieveSensorLocation(sensorName).c_str());
+              serverName = "http://" + String(IP) + "/user/gardening/Agrismart/deleteTable.php";
+              if (deleteTable(serverName, sensorName, sensorLocation)){
+                factoryReset(false);
+              } else {
+                if (ManualFactoryReset()){
+                  factoryReset(true);
+                }
               }
             }
           }
+          time_sleep_left = TIME_TO_UPDATE_IN_SEC;
         }
-        
-        time_sleep_left = TIME_TO_UPDATE_IN_SEC;
       break;
     }
   }
   
-  if (String(IP) != "no server"){
+  if (String(IP) != "no server" && AHT10_alive && VL53L0X_alive){
     time_sleep_left = Update(serverName, sensorName, sensorLocation);
+  } else {
+    time_sleep_left = TIME_TO_UPDATE_IN_SEC;
   }
   // WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 1); //enable brownout detector
   esp_sleep_enable_timer_wakeup(time_sleep_left*1000000-8000000); // delay average upon each sending 
   touchAttachInterrupt(TOUCH, TSR, threshold_touch);
   esp_sleep_enable_touchpad_wakeup();
+  digitalWrite(ERROR, LOW);
   Serial.println("Sleep now");
   Serial.flush();
   esp_deep_sleep_start();

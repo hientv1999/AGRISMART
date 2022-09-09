@@ -61,38 +61,46 @@ bool fastSetup(char (&wifiName)[32], char (&password)[63], char (&ip)[15], char 
     //get SSID
     std::string ssid  = pCharacteristic -> getValue();
     printlnClearOLED("Loading", WHITE, 1);
+    Serial.println("debug1");
     while (ssid.length() <=1){
       ssid  = pCharacteristic -> getValue();
     }
     pCharacteristic -> setValue("");
     pCharacteristic2 -> setValue("");
+    Serial.println("debug1a");
     //get Pass
     std::string pass  = pCharacteristic -> getValue();
     while (pass.length() <=1){
       pass  = pCharacteristic -> getValue();
     }
+    Serial.println("debug1b");
     pCharacteristic -> setValue("");
     //get Location
     std::string loc  = pCharacteristic -> getValue();
     while (loc.length() <=1){
       loc  = pCharacteristic -> getValue();
     }
+    Serial.println("debug1c");
     pCharacteristic -> setValue("");
     //get sensor name
     std::string sensorName  = pCharacteristic -> getValue();
     while (sensorName.length() <=1){
       sensorName  = pCharacteristic -> getValue();
     }
+    Serial.println("debug1d");
     pCharacteristic -> setValue("");
     //get IP
     std::string IP  = pCharacteristic -> getValue();
     while (IP.length() <=1){
       IP  = pCharacteristic -> getValue();
     }
+    Serial.println("debug1e");
     pCharacteristic -> setValue("");
+    Serial.println("debug2");
     //check WiFi connection
     WiFi.disconnect(true);
     WiFi.begin(ssid.c_str(), pass.c_str());
+    Serial.println("debug3");
     std::string return_msg = "Setup success";
     int i = 0;
     unsigned int start = millis();
@@ -163,7 +171,7 @@ std::string askForSSID(){
             delay(200);
         }
         pCharacteristic -> setValue("");
-        if (confirmation != "yes" && confirmation.length() > 1){
+        if (confirmation != "Yes" && confirmation.length() > 1){
                 printlnClearOLED(processText("Please type Yes only").c_str(), WHITE, 1);
                 printlnOLED("Try again now", WHITE, 1);      
         } else {

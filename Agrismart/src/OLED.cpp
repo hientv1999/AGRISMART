@@ -19,25 +19,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 extern int BUTTON_OLED;
 extern int TOUCH;
 extern uint16_t threshold_touch;
-void turnOnOLED(){
-    pinMode(BUTTON_OLED, OUTPUT);
-    digitalWrite(BUTTON_OLED, HIGH);
-    delay(100);
-    while(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
-        Serial.println(F("SSD1306 allocation failed"));
-        OLED_error();
-        delay(2000);
-    }
-    ledcDetachPin(ERROR);
-    Serial.println("OLED OK");
-    display.clearDisplay();
-}
 
-void turnOffOLED(){
-    display.clearDisplay();
-    display.display();
-    digitalWrite(BUTTON_OLED, LOW);
-}
 
 std::string processText(const char* text){
     std::string modified_text = text;
@@ -100,6 +82,34 @@ void printlnOLED(const char* text, const uint16_t color, const uint8_t size){
    display.println(text);
    display.display();
 }
+
+bool turnOnOLED(){
+    pinMode(BUTTON_OLED, OUTPUT);
+    digitalWrite(BUTTON_OLED, HIGH);
+    delay(100);
+    unsigned int origin = millis();
+    bool OLED_alive = display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    while(!OLED_alive && millis()- origin <= 10000) { // Address 0x3D for 128x64
+        OLED_error();
+        delay(1000);
+        OLED_alive = display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    }
+    ledcDetachPin(ERROR);
+    if (!OLED_alive){
+        Serial.println("SSD1306 failed");
+        return false;
+    } else {
+        Serial.println("OLED OK");
+        return true;
+    }
+}
+
+void turnOffOLED(){
+    display.clearDisplay();
+    display.display();
+    digitalWrite(BUTTON_OLED, LOW);
+}
+
 bool setupOption(bool firstTime){
     if (firstTime){
         printlnClearOLED(processText("Welcome to Agrismart").c_str(), WHITE, 1);
@@ -269,7 +279,7 @@ void printWelcomeScreen(){
     
 }
 
-void displayOverview(){
+void displayOverview(bool AHT10_alive, bool VL53L0X_alive){
     display.clearDisplay();
     display.setTextColor(WHITE);
     display.setTextSize(1);
@@ -328,17 +338,17 @@ void displayOverview(){
     display.drawFastVLine(0, 12, 20, WHITE);
     display.drawFastVLine(127, 12, 20, WHITE);
     display.setCursor(2, 14);
-    display.print(getTemperature() + char(247) + "C");
+    display.print(getTemperature(AHT10_alive) + char(247) + "C");
     display.setCursor(2, 24);
-    display.print(getHumidity() + "%");
+    display.print(getHumidity(AHT10_alive) + "%");
     display.setCursor(52, 14);
-    display.print(String(waterLevelPercentage()) + "%");
+    display.print(waterLevelPercentage(VL53L0X_alive) + "%");
     display.setCursor(52, 24);
-    display.print(String(chargingCurrent()) + "mA");
+    display.print(String(chargingPower(), 2) + "W");
     display.display();
 }
 
-void displayTemperature(){   // from -20C to 40C is proportionally display
+void displayTemperature(bool AHT10_alive){   // from -20C to 40C is proportionally display
     static const unsigned char PROGMEM Temperature[] = 
     {   0x01, 0xe0, 0x00, 0x03, 0xf8, 0x00, 0x06, 0x18, 0x00, 0x0c, 0x0d, 0x80, 0x0c, 0x0c, 0x00, 0x0c, 
 	0x0c, 0x00, 0x0c, 0x0d, 0x80, 0x0c, 0x0c, 0x80, 0x0c, 0x0c, 0x00, 0x0c, 0x0d, 0x80, 0x0c, 0x0d, 
@@ -357,12 +367,17 @@ void displayTemperature(){   // from -20C to 40C is proportionally display
     display.setTextColor(WHITE);
     display.setTextSize(2);
     display.setCursor(35, 16);
-    String text = String(myAHT10.readTemperature(), 2) + char(247) + "C";
+    String text;
+    if (AHT10_alive){
+        text = String(myAHT10.readTemperature(), 2) + char(247) + 'C';
+    } else {
+        text = String("???") + char(247) + 'C';
+    }
     display.print(text);
     display.display();
 }
 
-void displayHumidity(){
+void displayHumidity(bool AHT10_alive){
     static const unsigned char PROGMEM Humidity[] = 
     {   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x00, 0x00, 
 	0x00, 0x01, 0xf0, 0x00, 0x00, 0x00, 0x03, 0xf8, 0x00, 0x00, 0x00, 0x03, 0xf8, 0x00, 0x00, 0x00, 
@@ -379,28 +394,39 @@ void displayHumidity(){
     display.setTextColor(WHITE);
     display.setTextSize(2);
     display.setCursor(45, 16);
-    String text = String(myAHT10.readHumidity(), 2) + "%";
+    String text;
+    if (AHT10_alive){
+        text = String(myAHT10.readHumidity(), 2) + '%';
+    } else {
+        text = "???%";
+    }
     display.print(text);
     display.display();
 }
 
-void displayWaterLevel(){
+void displayWaterLevel(bool VL53L0X_alive){
     static const unsigned char PROGMEM Water[] = 
     {   0x00, 0xc0, 0x00, 0x01, 0xe0, 0x00, 0x07, 0x18, 0x00, 0x1c, 0x0e, 0x00, 0x30, 0x03, 0x80, 0xff, 
-	0xff, 0xc0, 0x60, 0x01, 0x80, 0x7f, 0xff, 0x80, 0x60, 0x01, 0x80, 0x60, 0xc0, 0x80, 0x61, 0xe0, 
-	0x80, 0x63, 0x30, 0x80, 0x62, 0x10, 0x80, 0x63, 0x90, 0x80, 0x63, 0xb0, 0x80, 0x61, 0xe0, 0x80, 
-	0x60, 0x00, 0x80, 0x7f, 0xff, 0x80, 0x60, 0x01, 0x80, 0xef, 0xfd, 0x80, 0x7b, 0xf7, 0x00, 0x18, 
-	0x06, 0x00, 0x1e, 0x1e, 0x00, 0x13, 0x32, 0x00, 0x11, 0xe2, 0x00, 0x11, 0xe2, 0x00, 0x13, 0x32, 
-	0x00, 0x1e, 0x1e, 0x00, 0x18, 0x06, 0x00, 0x10, 0x02, 0x00, 0x10, 0x02, 0x00    };
-    int level = waterLevelPercentage();
+    0xff, 0xc0, 0x60, 0x01, 0x80, 0x7f, 0xff, 0x80, 0x60, 0x01, 0x80, 0x60, 0xc0, 0x80, 0x61, 0xe0, 
+    0x80, 0x63, 0x30, 0x80, 0x62, 0x10, 0x80, 0x63, 0x90, 0x80, 0x63, 0xb0, 0x80, 0x61, 0xe0, 0x80, 
+    0x60, 0x00, 0x80, 0x7f, 0xff, 0x80, 0x60, 0x01, 0x80, 0xef, 0xfd, 0x80, 0x7b, 0xf7, 0x00, 0x18, 
+    0x06, 0x00, 0x1e, 0x1e, 0x00, 0x13, 0x32, 0x00, 0x11, 0xe2, 0x00, 0x11, 0xe2, 0x00, 0x13, 0x32, 
+    0x00, 0x1e, 0x1e, 0x00, 0x18, 0x06, 0x00, 0x10, 0x02, 0x00, 0x10, 0x02, 0x00    };
     display.clearDisplay();
     display.drawBitmap(10, (display.height() - 31)/2, Water, 18, 31, 1);
     display.setTextColor(WHITE);
     display.setTextSize(2);
     display.setCursor(45, 16);
-    display.print(level);
+    if (VL53L0X_alive){
+        int level =waterLevelPercentage(true).toInt();
+        display.print(level);
+    } else {
+        display.print("???");
+    }
     display.print("%");
     display.display();
+    
+    
 }
 void displayBatteryLevel(){
     static const unsigned char PROGMEM battery[] =
