@@ -1,6 +1,6 @@
 int WATER_LEVEL_MAX_MILIMETER = 200;
-int SOIL_MOISTURE = 39;
-int WATER_PUMP = 17;
+extern int SOIL_MOISTURE;
+extern int WATER_PUMP;
 const int frequencyPWM = 1000;
 const int PWMchannel = 3;
 const int resolution = 8;
@@ -43,7 +43,7 @@ String waterLevelPercentage(bool VL53L0X_alive){
 }
 
 unsigned int soilMoisture(){
-    return analogRead(SOIL_MOISTURE); // add the calibrated equation here
+    return 0; // add the calibrated equation here
 }
 
 void pumpWater(unsigned int powerInPercentage){

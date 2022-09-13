@@ -1,27 +1,30 @@
-    #include <Arduino.h>
-int BATT_LEVEL = 34;
-int CHAR_CUR = 35;
-
+#include <Arduino.h>
+extern int CC;
+extern int USB_PLUG;
 float ReadVoltageAnalogPin(int pin){
   return float(analogRead(pin))/4095*3.1+0.1;
 }
 
 unsigned int getBatteryLevel(){
-    return ReadVoltageAnalogPin(BATT_LEVEL)*32.3834;
+    return 0;
+    // return ReadVoltageAnalogPin(BATT_LEVEL)*32.3834;
 }
 
 unsigned int chargingCurrent(){    // in mA integer
-    return ReadVoltageAnalogPin(CHAR_CUR) * 1000 / 3;
+    return 0;
+    // return ReadVoltageAnalogPin(CHAR_CUR) * 1000 / 3;
 }
 
 float chargingPower(){
-    return ReadVoltageAnalogPin(BATT_LEVEL)*chargingCurrent()/1000;
+    return 0;
+    // return ReadVoltageAnalogPin(BATT_LEVEL)*chargingCurrent()/1000;
 }
 
 bool batteryCharging(){ // less than 100mA consider no charging
-    if (chargingCurrent() < 100){ 
-        return false;
-    } else {
+    // either solar or USB plug
+    if (chargingCurrent() > 100 || (ReadVoltageAnalogPin(CC) -0.86 > 0 && ReadVoltageAnalogPin(USB_PLUG) > 2)){ 
         return true;
+    } else {
+        return false;
     }
 }

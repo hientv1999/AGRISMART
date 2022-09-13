@@ -9,24 +9,34 @@
 #include "BLE_functions.hpp"
 #include "battery.hpp"
 #include "watering.hpp"
+#include "error.hpp"
 #define EEPROM_SIZE_TO_ACCESS 4096
 unsigned int NUM_OF_DATATYPE = 6; //air temperature - air humidity - water level - battery level - charging current - watering
 const uint64_t TIME_TO_UPDATE_IN_SEC = 300; //time between uploading data to LAMP server in second
-#define I2C_SDA 25
-#define I2C_SCL 26
+#define I2C_SDA 25 
+#define I2C_SCL 26 
+#define BUTTON_PIN_BITMASK 0x8000000000 // 2^39 in hex
 /*This will be randomly created in mass production*/
 
 /*-----------PIN DEFINITION---------------------*/
+int TOUCH = 13;
+int NIGHT_LIGHT = 16;
+int WATER_PUMP = 17;
+int ENABLE_BOOST = 18;
 int HAPTIC = 19;
+int DISABLE_CHARGE = 23;
 int BUTTON_OLED = 32;
 int ERROR = 33;
-int  TOUCH = 13;
+int CC = 34;
+int USB_PLUG = 39;
+/*-----------SESSION SETTING---------------------*/
 bool toggleDisplay;
+bool togglePlug;
 uint16_t threshold_touch = 20;
 RTC_DATA_ATTR unsigned int tap_num = 0;
 RTC_DATA_ATTR uint64_t lastUpdate; //epoch time in second for last update
 RTC_DATA_ATTR unsigned int watering = 0;
-
+RTC_DATA_ATTR bool charging_plug = false;
 
 int getTouchValue(uint16_t pin){
   int value = 0;
@@ -44,6 +54,7 @@ void cycleOLED(){
   toggleDisplay = true;
 }
 
+
 uint64_t Update(String serverName, char sensorName[], char sensorLocation[]){
   const char apiKeyValue[] = "TemperatureHumidity";
   uint64_t sinceLastUpdate = getTime() - lastUpdate;
@@ -52,12 +63,12 @@ uint64_t Update(String serverName, char sensorName[], char sensorLocation[]){
     String dataName[NUM_OF_DATATYPE] = {"Temperature", "Humidity", "WaterLevel", "BatteryLevel", "ChargingCurrent", "Watering"};
     String dataValue[NUM_OF_DATATYPE] = {String(getTemperature(true)), String(getHumidity(true)), String(waterLevelPercentage(true)), String(getBatteryLevel()), String(chargingCurrent()), "1"};
     if (sendDataLAMP(serverName.c_str(), sensorName, sensorLocation, apiKeyValue, dataName, dataValue, NUM_OF_DATATYPE)){
-        lastUpdate = getTime();
-        time_sleep_left = TIME_TO_UPDATE_IN_SEC;
+      lastUpdate = getTime();
     } else {
-        time_sleep_left = 9;
+      Serial.println("server error LED blinking");
+      server_error();
     }
-    
+    time_sleep_left = TIME_TO_UPDATE_IN_SEC;
     watering = 0;
     //check soil
     if (soilMoisture() <= 40){
@@ -74,11 +85,46 @@ void setup()
 {
   pinMode(HAPTIC, OUTPUT);
   pinMode(ERROR, OUTPUT);
-  pinMode(HAPTIC, OUTPUT);
-  Wire1.begin(I2C_SDA, I2C_SCL, 100000);
+  pinMode(DISABLE_CHARGE, OUTPUT);
+  pinMode(BUTTON_OLED, OUTPUT);
+  pinMode(NIGHT_LIGHT, OUTPUT);
+  Wire1.begin(I2C_SDA, I2C_SCL, 100000); 
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
   Serial.begin(115200);
   Serial.println("Wake up");
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0){  // USB is plugged/unplugged
+    Serial.println("USB Type-C state changes");
+    turnOnOLED();
+    float CC_volt = ReadVoltageAnalogPin(CC);
+    if (CC_volt - 0.33 > 0 && CC_volt - 0.86 < 0){  // USB cable not supply enough current
+      charging_plug = true;
+      digitalWrite(DISABLE_CHARGE, HIGH);
+      displayWarningPlug();
+      Serial.println("Not enough current");
+    } else if (CC_volt - 0.86 > 0){                 // enough current
+      charging_plug = true;
+      digitalWrite(DISABLE_CHARGE, LOW);
+      Serial.println("Start charging");
+      displayPlugInUSB_C(true);
+    } else {                                        // unplug cable
+      charging_plug = false;
+      digitalWrite(DISABLE_CHARGE, LOW);
+      Serial.println("Stop charging");
+      displayPlugInUSB_C(false);
+    }
+    turnOffOLED();
+    if (charging_plug){
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_39, 0);
+      esp_sleep_enable_timer_wakeup(0xFFFFFFFFFFFFFFFF);    // sleep for infinite
+      touchAttachInterrupt(TOUCH, TSR, threshold_touch);
+      esp_sleep_enable_touchpad_wakeup();
+      
+      Serial.println("Charge sleep now");
+      Serial.flush();
+      esp_deep_sleep_start(); 
+    }
+  } 
   EEPROM.begin(EEPROM_SIZE_TO_ACCESS);
   uint64_t time_sleep_left = TIME_TO_UPDATE_IN_SEC;
   char ssid[32] ={};
@@ -94,7 +140,7 @@ void setup()
     // turn on OLED, display welcome screen, turn on sensor, turn on BLE
     turnOnOLED();
     turnOnBLE("Unnamed Agrismart");
-    printWelcomeScreen();
+    welcomeScreen();
     AHT10_alive = turnOnTempHum();
     VL53L0X_alive = turnOnTOF();
     if (setupOption(true)){
@@ -154,14 +200,15 @@ void setup()
     turnOffOLED();
     FinishSetup();
   } else {
-    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
     switch(wakeup_reason){
     case ESP_SLEEP_WAKEUP_TOUCHPAD : //touch pad
       {
         digitalWrite(HAPTIC, HIGH);
         delay(10);
         digitalWrite(HAPTIC, LOW);
+        // read SOLAR_VOLT < 1V then pull NIGHT_LIGHT high, at the end pull NIGHT_LIGHT low
         if (turnOnOLED()){
+          displayTurnOnAnimation();
           AHT10_alive = turnOnTempHum();
           VL53L0X_alive = turnOnTOF();
           strcpy(sensorName, retrieveSensorName().c_str());
@@ -174,9 +221,30 @@ void setup()
           Serial.println("Prepare to display");
           touchAttachInterrupt(TOUCH, cycleOLED , threshold_touch);
           toggleDisplay = false;
-          // calculate battery level bitmap here
+          togglePlug = false;
+          float CC_volt;
+          float USB_PLUG_volt;
           unsigned int lastPressOLED = millis();
           while (millis() - lastPressOLED <= 15000){ //cycle through display mode
+            // USB screen if plug/unplug
+            USB_PLUG_volt = ReadVoltageAnalogPin(USB_PLUG);
+            if ((USB_PLUG_volt > 2 && charging_plug == false) || (USB_PLUG_volt < 2 && charging_plug == true)){
+              if (USB_PLUG_volt > 2){
+                charging_plug = true;
+              } else {
+                charging_plug= false;
+              }
+              CC_volt = ReadVoltageAnalogPin(CC);
+              if (CC_volt - 0.33 > 0 && CC_volt - 0.86 < 0){  // USB cable not supply enough current
+                digitalWrite(DISABLE_CHARGE, HIGH);
+                displayWarningPlug();
+                Serial.println("Not enough current");
+              } else {                                        // enough current or no connection
+                digitalWrite(DISABLE_CHARGE, LOW);
+                displayPlugInUSB_C(charging_plug);
+              }
+            }
+            // normal screen
             switch (tap_num){
               case 0: //everything
                 displayOverview(AHT10_alive, VL53L0X_alive);
@@ -205,7 +273,6 @@ void setup()
               default:  // never get here, error occurs
                 ESP.restart();  
             }
-            delay(500);
             if (toggleDisplay){
               tap_num ++;
               if (tap_num >= 6){
@@ -214,21 +281,19 @@ void setup()
               toggleDisplay = false;
               lastPressOLED = millis();
             }
+            delay(500);
           }    
           Serial.println("End of screen");
+          displayTurnOffAnimation();
           turnOffOLED();
         }
-        
+        detachInterrupt(USB_PLUG);
       }
     break;
     
     case ESP_SLEEP_WAKEUP_TIMER : //timer
       strcpy(sensorName, retrieveSensorName().c_str());
       turnOnWiFi(sensorName, false);
-      // //without below 3 lines, TempHum cannot be initialized
-      // pinMode(BUTTON_OLED, OUTPUT);
-      // digitalWrite(BUTTON_OLED, HIGH);
-      // delay(100);
       //turn sensors on
       AHT10_alive = turnOnTempHum(false);
       VL53L0X_alive = turnOnTOF(false);
@@ -236,10 +301,13 @@ void setup()
       strcpy(sensorLocation, retrieveSensorLocation(sensorName).c_str());
       serverName = "http://" + String(IP) + "/user/gardening/Agrismart/post_data.php";
     break;
+    
+    case ESP_SLEEP_WAKEUP_EXT0:
+    break;
 
     default:  // wakeup by reset
         if (turnOnOLED()){
-          printWelcomeScreen();
+          welcomeScreen();
           strcpy(sensorName, retrieveSensorName().c_str());
           turnOnWiFi(sensorName, true);
           if (getTouchValue(TOUCH) < threshold_touch){
@@ -269,20 +337,22 @@ void setup()
       break;
     }
   }
-  
-  if (String(IP) != "no server" && AHT10_alive && VL53L0X_alive){
-    time_sleep_left = Update(serverName, sensorName, sensorLocation);
-  } else {
-    time_sleep_left = TIME_TO_UPDATE_IN_SEC;
+  if (wakeup_reason != ESP_SLEEP_WAKEUP_EXT0){
+    if (String(IP) != "no server" && AHT10_alive && VL53L0X_alive){
+      time_sleep_left = Update(serverName, sensorName, sensorLocation);
+    } else {
+      time_sleep_left = TIME_TO_UPDATE_IN_SEC;
+    }
   }
+  
   // WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 1); //enable brownout detector
-  esp_sleep_enable_timer_wakeup(time_sleep_left*1000000-8000000); // delay average upon each sending 
+  esp_sleep_enable_timer_wakeup(time_sleep_left*1000000-8000000); 
   touchAttachInterrupt(TOUCH, TSR, threshold_touch);
   esp_sleep_enable_touchpad_wakeup();
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_39, 1);
   digitalWrite(ERROR, LOW);
   Serial.println("Sleep now");
   Serial.flush();
   esp_deep_sleep_start();
-  //Wire.setClock(400000); //experimental I2C speed! 400KHz, default 100KHz
 }
 void loop(){}

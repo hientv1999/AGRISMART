@@ -1,21 +1,22 @@
 #include <esp32-hal-ledc.h>
 extern int ERROR;
-int high_frequency = 1000;   //solid 
-int low_frequency = 1;   //fast
+int solid_frequency = 1000;   //solid 
+int blink_frequency = 1;   // low
 
 void OLED_error(){
-    ledcSetup(0, low_frequency, 8);
+    ledcSetup(0, solid_frequency, 8);
     ledcAttachPin(ERROR, 0);
     ledcWrite(0, 99);
     
 }
 
-// void TempHum_error(){
-//     ledcDetachPin(ERROR);
-//     ledcSetup(1, low_frequency, 8);
-//     ledcAttachPin(ERROR, 1);
-//     ledcWrite(1, 99);
-// }
+
+void server_error(){
+    ledcDetachPin(ERROR);
+    ledcSetup(1, blink_frequency, 8);
+    ledcAttachPin(ERROR, 1);
+    ledcWrite(1, 99);
+}
 
 // void TOF_error(){
 //     ledcDetachPin(ERROR);
