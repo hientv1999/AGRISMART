@@ -217,6 +217,11 @@ void setup()
           AHT10_alive = turnOnTempHum();
           VL53L0X_alive = turnOnTOF();
           ADS1115_alive = turnOnADC();
+          if (ADS1115_alive){
+            if (solarVoltage() - 1 < 0){
+              digitalWrite(NIGHT_LIGHT, HIGH);
+            }
+          }
           strcpy(sensorLocation, retrieveSensorLocation(sensorName).c_str());
           gmtOffset_sec = retrieveOffset(sensorName);
           configTime(gmtOffset_sec, 0, "pool.ntp.org");
@@ -289,8 +294,8 @@ void setup()
           Serial.println("End of screen");
           displayTurnOffAnimation();
           turnOffOLED();
+          digitalWrite(NIGHT_LIGHT, LOW);
         }
-        detachInterrupt(USB_PLUG);
       }
     break;
     
