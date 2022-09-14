@@ -9,8 +9,12 @@ extern int ERROR;
 #include <Adafruit_SSD1306.h>
 #include <Arduino.h>
 #include <VL53L0X.h>
+#include <Adafruit_ADS1X15.h>
 #include <Wire.h>
 #include "error.hpp"
+#include "battery.hpp"
+extern Adafruit_ADS1115 ads;
+
 VL53L0X waterLevelSensor;
 bool turnOnTOF(bool display_text){
     waterLevelSensor.setBus(&Wire1);
@@ -42,8 +46,12 @@ String waterLevelPercentage(bool VL53L0X_alive){
     }
 }
 
-unsigned int soilMoisture(){
-    return 0; // add the calibrated equation here
+float soilMoisture(){
+    ads.setGain(GAIN_ONE);
+    unsigned int moisture = ads.readADC_SingleEnded(2);
+    ads.setGain(GAIN_EIGHT);  
+    float moisture_level = moisture; // add the calibrated equation here
+    return moisture_level; 
 }
 
 void pumpWater(unsigned int powerInPercentage){

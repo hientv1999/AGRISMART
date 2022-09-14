@@ -341,7 +341,7 @@ void setup()
     }
   }
   if (wakeup_reason != ESP_SLEEP_WAKEUP_EXT0){
-    if (String(IP) != "no server" && AHT10_alive && VL53L0X_alive){
+    if (String(IP) != "no server" && AHT10_alive && VL53L0X_alive && ADS1115_alive){
       time_sleep_left = Update(serverName, sensorName, sensorLocation);
     } else {
       time_sleep_left = TIME_TO_UPDATE_IN_SEC;
