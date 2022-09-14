@@ -3,12 +3,11 @@
 #include <AHT10.h>
 #include <Wire.h>
 #include <Adafruit_SSD1306.h>
-#include "error.hpp"
 extern int ERROR;
 AHT10 myAHT10(AHT10_ADDRESS_0X38);
 bool turnOnTempHum(bool display_text){
    unsigned long start_time = millis();
-   while (myAHT10.begin() != true && millis() - start_time <= 3000)
+   while (!myAHT10.begin() && millis() - start_time <= 3000)
    {
       // TempHum_error();
       if (display_text){
@@ -16,26 +15,24 @@ bool turnOnTempHum(bool display_text){
          delay(500);
       }
    }
-   if (myAHT10.begin() != true){
+   if (!myAHT10.begin()){
       Serial.println("AHT10 failed");
       return false;
    }
-   // ledcDetachPin(ERROR);
    Serial.println("AHT10 OK");
    return true;
 }
 String getTemperature(bool AHT10_alive){
    if (!AHT10_alive){
-      return "???";
+      return "?? ";
    } else {
       String temperature = String(myAHT10.readTemperature(), 2);
       return temperature;
    }
-   
 }
 String getHumidity(bool AHT10_alive){
    if (!AHT10_alive){
-      return "???";
+      return "?? ";
    } else {
       String humidity = String(myAHT10.readHumidity(), 2);
       return humidity;

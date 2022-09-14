@@ -136,6 +136,7 @@ void setup()
   String serverName = "";
   bool AHT10_alive = false;
   bool VL53L0X_alive = false;
+  bool ADS1115_alive = false;
   if (FirstSetup() == 0){                 // first time setup
     // turn on OLED, display welcome screen, turn on sensor, turn on BLE
     turnOnOLED();
@@ -143,6 +144,7 @@ void setup()
     welcomeScreen();
     AHT10_alive = turnOnTempHum();
     VL53L0X_alive = turnOnTOF();
+    ADS1115_alive = turnOnADC();
     if (setupOption(true)){
       //fast setup
       while (!fastSetup(ssid, pass, IP, sensorName, sensorLocation)){
@@ -209,11 +211,12 @@ void setup()
         // read SOLAR_VOLT < 1V then pull NIGHT_LIGHT high, at the end pull NIGHT_LIGHT low
         if (turnOnOLED()){
           displayTurnOnAnimation();
-          AHT10_alive = turnOnTempHum();
-          VL53L0X_alive = turnOnTOF();
           strcpy(sensorName, retrieveSensorName().c_str());
           strcpy(IP, retrieveIP(sensorName).c_str());
           turnOnWiFi(sensorName, true);
+          AHT10_alive = turnOnTempHum();
+          VL53L0X_alive = turnOnTOF();
+          ADS1115_alive = turnOnADC();
           strcpy(sensorLocation, retrieveSensorLocation(sensorName).c_str());
           gmtOffset_sec = retrieveOffset(sensorName);
           configTime(gmtOffset_sec, 0, "pool.ntp.org");
@@ -247,7 +250,7 @@ void setup()
             // normal screen
             switch (tap_num){
               case 0: //everything
-                displayOverview(AHT10_alive, VL53L0X_alive);
+                displayOverview(AHT10_alive, VL53L0X_alive, ADS1115_alive);
               break;
 
               case 1: // big temp
@@ -263,7 +266,7 @@ void setup()
               break;
 
               case 4: // batterry level
-                displayBatteryLevel(); 
+                displayBatteryLevel(ADS1115_alive); 
               break;
 
               case 5: // wifi signal

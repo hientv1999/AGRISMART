@@ -330,7 +330,7 @@ void displayPlugInUSB_C(bool plug){
     if (plug){
         i=128;
     }
-    while (millis() - start_time <= 2000){
+    while (millis() - start_time <= 1250){
         display.clearDisplay();
         // draw socket
         display.drawRoundRect(19, 4, 11, 27, 6, WHITE);
@@ -378,46 +378,44 @@ void displayWarningPlug(){
 
 void displayTurnOnAnimation(){
     // point to line
-    for (int i=63; i>=50; i-=2){
-        delay(20);
+    for (int i=63; i>0; i-=8){
+        delay(10);
         display.clearDisplay();
-        display.drawFastHLine(i, 15, (64-i)*2, WHITE);
+        display.drawRoundRect(i, 15, (64-i)*2, 3, 3, WHITE);
         display.display();
         
     }
     // line to rectangle
-    for (int i=0; i<=13; i++){
-        delay(15);
+    for (int i=0; i<=16; i+=2){
+        delay(10);
         display.clearDisplay();
-        display.drawRoundRect(50-4*i, int(14-i*1.2), int(28+8*i), int(3+2.4*i), 3, WHITE);
+        display.drawRoundRect(-2, 15-i, 132, 3+i*2, 3, WHITE);
         display.display();
     }
 }
 
 void displayTurnOffAnimation(){
     // line to rectangle
-    for (int i=13; i>=0; i--){
-        delay(20);
+    for (int i=16; i>=0; i-=2){
+        delay(10);
         display.clearDisplay();
-        display.drawRoundRect(50-4*i, int(14-i*1.2), int(28+8*i), int(3+2.4*i), 3, WHITE);
+        display.drawRoundRect(-2, 15-i, 132, 3+i*2, 3, WHITE);
         display.display();
     }
     // point to line
-    for (int i=50; i<=63; i+=2){
-        delay(20);
+    for (int i=-1; i<=63; i+=8){
+        delay(10);
         display.clearDisplay();
-        display.drawFastHLine(i, 15, (64-i)*2, WHITE);
+        display.drawRoundRect(i, 15, (64-i)*2, 3, 3, WHITE);
         display.display();
-        
     }
 }
 
-void displayOverview(bool AHT10_alive, bool VL53L0X_alive){
+void displayOverview(bool AHT10_alive, bool VL53L0X_alive, bool ADS1115_alive){
     display.clearDisplay();
     display.setTextColor(WHITE);
     display.setTextSize(1);
     //Battery level
-    unsigned int batteryLevel = getBatteryLevel();
     display.drawFastHLine(1, 1, 12, WHITE);
     display.drawFastVLine(13, 1, 2, WHITE);
     display.drawFastHLine(13, 3, 2, WHITE);
@@ -427,15 +425,21 @@ void displayOverview(bool AHT10_alive, bool VL53L0X_alive){
     display.drawFastHLine(1, 9, 12, WHITE);
     display.drawFastVLine(1, 1, 8, WHITE);
     display.fillRect(13,3,2,4,WHITE);
-    if (batteryCharging()){
-        display.drawLine(3, 3, 9, 7, WHITE);
-        display.drawLine(7, 3, 9, 7, WHITE);
-        display.drawLine(7, 3, 12, 7, WHITE);
+    if (ADS1115_alive){
+        unsigned int batteryLevel = getBatteryLevel();
+        if (batteryCharging()){
+            display.drawLine(3, 3, 9, 7, WHITE);
+            display.drawLine(7, 3, 9, 7, WHITE);
+            display.drawLine(7, 3, 12, 7, WHITE);
+        } else {
+            display.fillRect(1,1,12*batteryLevel/100,8, WHITE);
+        }
+        display.setCursor(20, 2);
+        display.print(String(batteryLevel) + "%");
     } else {
-        display.fillRect(1,1,12*batteryLevel/100,8, WHITE);
+        display.setCursor(20, 2);
+        display.print("?%");
     }
-    display.setCursor(20, 2);
-    display.print(String(batteryLevel) + "%");
     //Time
     struct tm timeinfo;
     if (getLocalTime(&timeinfo)){
@@ -453,7 +457,7 @@ void displayOverview(bool AHT10_alive, bool VL53L0X_alive){
         }
         display.print(String(timeinfo.tm_sec));
     } 
-    // Charging
+    // USB Plug
     if (charging_plug){ 
         display.drawRoundRect(94, 3, 18, 7, 3, WHITE);
         display.drawFastHLine(97, 6, 12, WHITE);
@@ -481,8 +485,22 @@ void displayOverview(bool AHT10_alive, bool VL53L0X_alive){
     display.print(getHumidity(AHT10_alive) + "%");
     display.setCursor(46, 14);
     display.print(waterLevelPercentage(VL53L0X_alive) + "%");
-    display.setCursor(50, 24);
-    display.print(String(chargingPower(), 2) + "W");
+    if (ADS1115_alive){
+        float chargePower = chargingPower();
+        if (chargingPower() > 0){
+            display.setCursor(50, 24);
+        } else {
+            display.setCursor(46, 24);
+        }
+        display.print(String(chargePower, 2) + "W");
+        display.setCursor(98, 14);
+        display.print(String(solarVoltage(), 2) + "V");
+    } else {
+        display.setCursor(50, 24);
+        display.print( "?? W");
+        display.setCursor(98, 14);
+        display.print("?? V");
+    }
     display.display();
 }
 
@@ -495,20 +513,23 @@ void displayTemperature(bool AHT10_alive){   // from -20C to 40C is proportional
 	0xfc, 0xc0, 0xcf, 0xfc, 0xc0, 0x47, 0xf8, 0x80, 0x67, 0xf9, 0x80, 0x33, 0xf3, 0x00, 0x38, 0x03, 
 	0x00, 0x1c, 0x0e, 0x00, 0x0f, 0xfc, 0x00, 0x01, 0xe0, 0x00    };
     display.clearDisplay();
-    display.drawBitmap((display.width()  - 18 )/2-50, (display.height() - 30)/2, Temperature, 18, 30, 1);
-    float tempInC = myAHT10.readTemperature();
-    if (tempInC > 40.0){
-        display.fillRect(display.width()/2 - 51, (display.height()-30)/2 + 4, 2, 12, SSD1306_INVERSE);
-    } else if (tempInC <= 40.0 && tempInC >= -20.0){
-        display.fillRect(display.width()/2 - 51, (display.height()-30)/2 + 12 - int(12*(tempInC+20)/60) + 4, 2, int(12*(tempInC+20)/60), SSD1306_INVERSE);
-    }
-    display.setTextColor(WHITE);
-    display.setTextSize(2);
-    display.setCursor(35, 16);
+    display.drawBitmap(5, 1, Temperature, 18, 30, 1);
     String text;
     if (AHT10_alive){
+        float tempInC = myAHT10.readTemperature();
+        if (tempInC > 40.0){
+            display.fillRect(13, 5, 2, 12, SSD1306_INVERSE);
+        } else if (tempInC <= 40.0 && tempInC >= -20.0){
+            display.fillRect(13, 13 - int(12*(tempInC+20)/60) + 4, 2, int(12*(tempInC+20)/60), SSD1306_INVERSE);
+        }
+        display.setTextColor(WHITE);
+        display.setTextSize(2);
+        display.setCursor(35, 16);
         text = String(myAHT10.readTemperature(), 2) + char(247) + 'C';
     } else {
+        display.setTextColor(WHITE);
+        display.setTextSize(2);
+        display.setCursor(35, 16);
         text = String("???") + char(247) + 'C';
     }
     display.print(text);
@@ -528,7 +549,7 @@ void displayHumidity(bool AHT10_alive){
 	0x00, 0x00, 0x1f, 0xfe, 0x00, 0x00, 0x00, 0x0f, 0xfc, 0x00, 0x00, 0x00, 0x07, 0xf8, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00  };
     display.clearDisplay();
-    display.drawBitmap((display.width() - 34 )/2-40, (display.height() - 30)/2, Humidity, 34, 30, 1);
+    display.drawBitmap(7, 1, Humidity, 34, 30, 1);
     display.setTextColor(WHITE);
     display.setTextSize(2);
     display.setCursor(45, 16);
@@ -566,7 +587,7 @@ void displayWaterLevel(bool VL53L0X_alive){
     
     
 }
-void displayBatteryLevel(){
+void displayBatteryLevel(bool ADS1115_alive){
     static PROGMEM const unsigned char battery[] =
     { 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 
 	0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x60, 
@@ -586,19 +607,26 @@ void displayBatteryLevel(){
     { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x30, 0x00, 0x1c, 0x38, 0x00, 0x07, 
 	0xbe, 0x00, 0x03, 0xff, 0x80, 0x00, 0xf9, 0xe0, 0x00, 0x38, 0x70, 0x00, 0x18, 0x08, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00};
-    unsigned int batteryLevel = getBatteryLevel();
     display.clearDisplay();
     display.drawBitmap(8, 2, battery, 64, 28, WHITE);
-    if (batteryCharging()){
-        display.drawBitmap(20 + 4, 10, lightning, 20, 10, 1);
+    if (ADS1115_alive){
+        unsigned int batteryLevel = getBatteryLevel();
+        if (batteryCharging()){
+            display.drawBitmap(26, 10, lightning, 20, 10, 1);
+        } else {
+            display.fillRect(12, 6, 51*batteryLevel/100, 20, SSD1306_INVERSE);
+        }
+        display.setTextColor(WHITE);
+        display.setTextSize(2);
+        display.setCursor(75, 10);
+        display.print(batteryLevel);
+        display.print("%");
     } else {
-        display.fillRect(8 + 4, 2 + 4, 51*batteryLevel/100, 20, SSD1306_INVERSE);
+        display.setTextColor(WHITE);
+        display.setTextSize(2);
+        display.setCursor(75, 10);
+        display.print("?? %");
     }
-    display.setTextColor(WHITE);
-    display.setTextSize(2);
-    display.setCursor(75, 10);
-    display.print(batteryLevel);
-    display.print("%");
     display.display();
 }
 
@@ -636,11 +664,11 @@ void displayWiFi(){
     display.clearDisplay();
     int signalStrength = WiFi.RSSI();
     if (signalStrength > -55){
-        display.drawBitmap((display.width()  - 38 )/2, (display.height() - 28)/2, WiFiStrong, 38, 28, 1);
+        display.drawBitmap(45, 2, WiFiStrong, 38, 28, 1);
     } else if (signalStrength < -75){
-        display.drawBitmap((display.width()  - 38 )/2, (display.height() - 28)/2, WiFiWeak, 38, 28, 1);
+        display.drawBitmap(45, 2, WiFiWeak, 38, 28, 1);
     } else {
-        display.drawBitmap((display.width()  - 38 )/2, (display.height() - 28)/2, WiFiNormal, 38, 28, 1);
+        display.drawBitmap(45, 2, WiFiNormal, 38, 28, 1);
     }
     display.display();
 }

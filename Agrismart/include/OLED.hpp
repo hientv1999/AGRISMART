@@ -16,11 +16,11 @@ void displayPlugInUSB_C(bool plug);
 void displayWarningPlug();
 void displayTurnOnAnimation();
 void displayTurnOffAnimation();
-void displayOverview(bool AHT10_alive, bool VL53L0X_alive);
+void displayOverview(bool AHT10_alive, bool VL53L0X_alive, bool ADS1115_alive);
 void displayTemperature(bool AHT10_alive);
 void displayHumidity(bool AHT10_alive);
 void displayWaterLevel(bool VL53L0X_alive);
-void displayBatteryLevel();
+void displayBatteryLevel(bool ADS1115_alive);
 void displayWiFi();
 bool ManualFactoryReset();
 #endif

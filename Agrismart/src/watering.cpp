@@ -16,7 +16,7 @@ bool turnOnTOF(bool display_text){
     waterLevelSensor.setBus(&Wire1);
     waterLevelSensor.setTimeout(500);
     unsigned long start_time = millis();
-    while (waterLevelSensor.init() != true && millis() - start_time <= 3000) {
+    while (!waterLevelSensor.init() && millis() - start_time <= 3000) {
         // TOF_error();
         if (display_text){
             printlnClearOLED(processText("Fail to initialize VL53L0X sensor").c_str(), WHITE, 1);
@@ -24,7 +24,7 @@ bool turnOnTOF(bool display_text){
         }
     }
     // ledcDetachPin(ERROR);
-    if (waterLevelSensor.init() != true){
+    if (!waterLevelSensor.init()){
         Serial.println("VL53L0X failed");
         return false;
     }
