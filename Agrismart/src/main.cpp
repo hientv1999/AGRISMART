@@ -48,7 +48,7 @@ int getTouchValue(uint16_t pin){
 
 void TSR(){}
 
-void cycleOLED(){
+void IRAM_ATTR cycleOLED(){
   digitalWrite(HAPTIC, HIGH);
   digitalWrite(HAPTIC, LOW);
   touchDetect = true;

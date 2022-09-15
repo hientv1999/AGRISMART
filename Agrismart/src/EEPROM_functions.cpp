@@ -70,7 +70,6 @@ void saveOffset(const long offset) {
 }
 
 void saveBottomWaterLevel(){
-    waterLevelSensor.setMeasurementTimingBudget(200000);
     uint16_t level = waterLevelSensor.readRangeSingleMillimeters();
     for (int i = 0; i < 2; i++){
         EEPROM.write(188+i, (level >> i*8) & 0xFF);
@@ -81,7 +80,6 @@ void saveBottomWaterLevel(){
 }
 
 void saveTopWaterLevel(){
-    waterLevelSensor.setMeasurementTimingBudget(200000);
     uint16_t level = waterLevelSensor.readRangeSingleMillimeters();
     for (int i = 0; i < 2; i++){
         EEPROM.write(190+i, (level >> i*8) & 0xFF);

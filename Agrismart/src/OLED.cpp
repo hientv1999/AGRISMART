@@ -587,7 +587,7 @@ void displayWaterLevel(bool VL53L0X_alive){
         int level =waterLevelPercentage(true).toInt();
         if (level > 100){
             display.fillRect(22, 2, 10, 28, WHITE);
-        } else {
+        } else if (level >0){
             display.fillRect(22, 30-level*28/100, 10, level*28/100, WHITE);
         }
         display.setTextColor(WHITE);
