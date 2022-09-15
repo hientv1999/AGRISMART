@@ -2,10 +2,14 @@
 #include "OLED.hpp"
 #include "BLE_functions.hpp"
 #include <Adafruit_SSD1306.h>
+#include <VL53L0X.h>
+
 extern int TOUCH;
 extern int getTouchValue(uint16_t pin);
 extern int threshold_touch;
 extern int ERROR;
+VL53L0X waterLevelSensor;
+
 unsigned int FirstSetup(){  // 0 means first setup, 1 means wake up
    return EEPROM.read(0);
 }
@@ -15,7 +19,7 @@ void FinishSetup(){
 }
 
 void saveSSID(const char text[], int length){
-    for (int i=0; i < length; i++){
+    for (int i = 0; i < length; i++){
         EEPROM.write(10+i, text[i]);
         EEPROM.commit();
     }
@@ -24,7 +28,7 @@ void saveSSID(const char text[], int length){
 
 }
 void savePassword(const char text[], int length){
-    for (int i=0; i < length; i++){
+    for (int i = 0; i < length; i++){
         EEPROM.write(42+i, text[i]);
         EEPROM.commit();
     }
@@ -32,7 +36,7 @@ void savePassword(const char text[], int length){
     EEPROM.commit();
 }
 void saveIP(const char text[], int length){
-    for (int i=0; i < length; i++){
+    for (int i = 0; i < length; i++){
         EEPROM.write(105+i, text[i]);
         EEPROM.commit();
     }
@@ -40,7 +44,7 @@ void saveIP(const char text[], int length){
     EEPROM.commit();
 }
 void saveSensorName(const char text[], int length){
-    for (int i=0; i < length; i++){
+    for (int i = 0; i < length; i++){
         EEPROM.write(120+i, text[i]);
         EEPROM.commit();
     }
@@ -48,7 +52,7 @@ void saveSensorName(const char text[], int length){
     EEPROM.commit();
 }
 void saveSensorLocation(const char text[], int length){
-    for (int i=0; i < length; i++){
+    for (int i = 0; i < length; i++){
         EEPROM.write(152+i, text[i]);
         EEPROM.commit();
     }
@@ -57,11 +61,33 @@ void saveSensorLocation(const char text[], int length){
 }
 
 void saveOffset(const long offset) {
-    for (int i=0; i<4; i++){
+    for (int i = 0; i < 4; i++){
         EEPROM.write(184+i, (offset >> i*8) & 0xFF);
         EEPROM.commit();
     }
     EEPROM.write(6, 1);
+    EEPROM.commit();
+}
+
+void saveBottomWaterLevel(){
+    waterLevelSensor.setMeasurementTimingBudget(200000);
+    uint16_t level = waterLevelSensor.readRangeSingleMillimeters();
+    for (int i = 0; i < 2; i++){
+        EEPROM.write(188+i, (level >> i*8) & 0xFF);
+        EEPROM.commit();
+    }
+    EEPROM.write(7, 1);
+    EEPROM.commit();
+}
+
+void saveTopWaterLevel(){
+    waterLevelSensor.setMeasurementTimingBudget(200000);
+    uint16_t level = waterLevelSensor.readRangeSingleMillimeters();
+    for (int i = 0; i < 2; i++){
+        EEPROM.write(190+i, (level >> i*8) & 0xFF);
+        EEPROM.commit();
+    }
+    EEPROM.write(8, 1);
     EEPROM.commit();
 }
 
@@ -169,6 +195,26 @@ long retrieveOffset(char sensorName[]){
         turnOnBLE(sensorName);
         result = askForOffset();
         saveOffset(result);
+    }
+    return result;
+}
+
+uint16_t retrieveBottomWaterLevel(){
+    uint16_t result = 0;
+    if (EEPROM.read(7) != 0){
+        result = (EEPROM.read(188) & 0xFF) + ((EEPROM.read(189) << 8) & 0xFFFF);
+    } else {
+        result = 1000;
+    }
+    return result;
+}
+
+uint16_t retrieveTopWaterLevel(){
+    uint16_t result = 0;
+    if (EEPROM.read(8) != 0){
+        result = (EEPROM.read(190) & 0xFF) + ((EEPROM.read(191) << 8) & 0xFFFF);
+    } else {
+        result = 0;
     }
     return result;
 }

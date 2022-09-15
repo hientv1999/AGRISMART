@@ -13,9 +13,10 @@ extern int ERROR;
 #include <Wire.h>
 #include "error.hpp"
 #include "battery.hpp"
+#include "EEPROM_functions.hpp"
 extern Adafruit_ADS1115 ads;
 
-VL53L0X waterLevelSensor;
+extern VL53L0X waterLevelSensor;
 bool turnOnTOF(bool display_text){
     waterLevelSensor.setBus(&Wire1);
     waterLevelSensor.setTimeout(500);
@@ -40,8 +41,10 @@ String waterLevelPercentage(bool VL53L0X_alive){
     if (!VL53L0X_alive){
         return "???";
     } else {
+        uint16_t topLevel = retrieveTopWaterLevel();
+        uint16_t bottomLevel = retrieveBottomWaterLevel();
         waterLevelSensor.setMeasurementTimingBudget(200000);
-        float waterPercentage = (waterLevelSensor.readRangeSingleMillimeters()-92)*100/WATER_LEVEL_MAX_MILIMETER;   // add the calibrated equation here
+        float waterPercentage = (topLevel -waterLevelSensor.readRangeSingleMillimeters())*100/(topLevel - bottomLevel);   // add the calibrated equation here
         return String(waterPercentage, 2);
     }
 }

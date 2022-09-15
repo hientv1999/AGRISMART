@@ -30,7 +30,7 @@ int ERROR = 33;
 int CC = 34;
 int USB_PLUG = 39;
 /*-----------SESSION SETTING---------------------*/
-bool toggleDisplay;
+bool touchDetect;
 bool togglePlug;
 uint16_t threshold_touch = 20;
 RTC_DATA_ATTR unsigned int tap_num = 0;
@@ -51,7 +51,7 @@ void TSR(){}
 void cycleOLED(){
   digitalWrite(HAPTIC, HIGH);
   digitalWrite(HAPTIC, LOW);
-  toggleDisplay = true;
+  touchDetect = true;
 }
 
 
@@ -229,12 +229,13 @@ void setup()
           serverName = "http://" + String(IP) + "/user/gardening/Agrismart/post_data.php";
           Serial.println("Prepare to display");
           touchAttachInterrupt(TOUCH, cycleOLED , threshold_touch);
-          toggleDisplay = false;
+          touchDetect = false;
           togglePlug = false;
           float CC_volt;
           float USB_PLUG_volt;
           unsigned long lastPressOLED = millis();
-          bool longPress = false;
+          unsigned long lastTouch = millis();
+          bool toggleScreen = false;
           while (millis() - lastPressOLED <= 15000){ //cycle through display mode
             // USB screen if plug/unplug
             USB_PLUG_volt = ReadVoltageAnalogPin(USB_PLUG);
@@ -279,23 +280,67 @@ void setup()
               case 5: // wifi signal
                 displayWiFi(); 
               break;
+
+              case 6: // setup water level low
+                lastPressOLED = millis();
+                printlnClearOLED(processText("Tap to set current level as BOTTOM level. Wait to back to main screen").c_str(), WHITE, 1);
+                if (millis() - lastTouch >= 10000){
+                  tap_num = 3;
+                } else {
+                  if (touchDetect){
+                    if (millis() - lastTouch >= 3000){
+                      saveBottomWaterLevel();
+                      tap_num = 7;
+                      lastTouch = millis();
+                    }
+                    touchDetect = false;
+                  }
+                  
+                }
+              break;
               
+              case 7: // setup water level high
+                lastPressOLED = millis();
+                printlnClearOLED(processText("Tap to set current level as TOP level. Wait to back to main screen").c_str(), WHITE, 1);
+                if (millis() - lastTouch >= 10000){
+                  tap_num = 3;
+                } else {
+                  if (touchDetect){
+                    if (millis() - lastTouch >= 3000){
+                      saveTopWaterLevel();
+                      tap_num = 3;
+                      lastTouch = millis();
+                    }
+                    touchDetect = false;
+                  }
+                }
+              break;
+
               default:  // never get here, error occurs
                 printlnClearOLED(processText("Unexpected eror. Device will restart in 10 seconds").c_str(), WHITE, 1);
                 delay(10000);
                 ESP.restart();  
             }
-            unsigned long press_interval = millis() - lastPressOLED;
-            if (toggleDisplay){
-              if (press_interval >= 500){
-                tap_num ++;
-                if (tap_num >= 6){
-                  tap_num -= 6;
+            if (tap_num <6){
+              if (touchDetect){
+                toggleScreen = true;
+                if (millis() - lastTouch >= 500){
+                  if (millis() - lastTouch < 750 && tap_num == 3){  // long press on water level screen
+                    toggleScreen = false;
+                    tap_num = 6;        
+                  }
+                  lastTouch = millis();
+                } 
+                touchDetect = false;
+              } else {
+                if (millis() - lastTouch >=750 && toggleScreen){
+                  tap_num = (tap_num+1)%6;
+                  lastPressOLED = millis();
+                  toggleScreen = false;
                 }
-                lastPressOLED = millis();
               }
-              toggleDisplay = false;
             }
+            
           }    
           Serial.println("End of screen");
           displayTurnOffAnimation();
