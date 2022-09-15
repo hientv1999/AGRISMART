@@ -217,6 +217,7 @@ void setup()
           AHT10_alive = turnOnTempHum();
           VL53L0X_alive = turnOnTOF();
           ADS1115_alive = turnOnADC();
+
           if (ADS1115_alive){
             if (solarVoltage() - 1 < 0){
               digitalWrite(NIGHT_LIGHT, HIGH);
@@ -232,7 +233,8 @@ void setup()
           togglePlug = false;
           float CC_volt;
           float USB_PLUG_volt;
-          unsigned int lastPressOLED = millis();
+          unsigned long lastPressOLED = millis();
+          bool longPress = false;
           while (millis() - lastPressOLED <= 15000){ //cycle through display mode
             // USB screen if plug/unplug
             USB_PLUG_volt = ReadVoltageAnalogPin(USB_PLUG);
@@ -279,17 +281,21 @@ void setup()
               break;
               
               default:  // never get here, error occurs
+                printlnClearOLED(processText("Unexpected eror. Device will restart in 10 seconds").c_str(), WHITE, 1);
+                delay(10000);
                 ESP.restart();  
             }
+            unsigned long press_interval = millis() - lastPressOLED;
             if (toggleDisplay){
-              tap_num ++;
-              if (tap_num >= 6){
-                tap_num -= 6;
+              if (press_interval >= 500){
+                tap_num ++;
+                if (tap_num >= 6){
+                  tap_num -= 6;
+                }
+                lastPressOLED = millis();
               }
               toggleDisplay = false;
-              lastPressOLED = millis();
             }
-            delay(500);
           }    
           Serial.println("End of screen");
           displayTurnOffAnimation();
@@ -352,7 +358,6 @@ void setup()
       time_sleep_left = TIME_TO_UPDATE_IN_SEC;
     }
   }
-  
   // WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 1); //enable brownout detector
   esp_sleep_enable_timer_wakeup(time_sleep_left*1000000-8000000); 
   touchAttachInterrupt(TOUCH, TSR, threshold_touch);

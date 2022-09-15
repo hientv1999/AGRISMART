@@ -578,11 +578,11 @@ void displayWaterLevel(bool VL53L0X_alive){
     display.clearDisplay();
     // display.drawBitmap(10, (display.height() - 31)/2, Water, 18, 31, 1);
     display.drawFastVLine(20, 2, 28, WHITE);
-    display.drawFastHLine(10, 2, 10, WHITE);
-    display.drawFastHLine(15, 9, 5, WHITE);
-    display.drawFastHLine(10, 16, 10, WHITE);
-    display.drawFastHLine(15, 23, 5, WHITE);
-    display.drawFastHLine(10, 30, 10, WHITE);
+    display.drawFastHLine(14, 2, 6, WHITE);
+    display.drawFastHLine(18, 9, 3, WHITE);
+    display.drawFastHLine(14, 16, 6, WHITE);
+    display.drawFastHLine(18, 23, 3, WHITE);
+    display.drawFastHLine(14, 30, 10, WHITE);
     if (VL53L0X_alive){
         int level =waterLevelPercentage(true).toInt();
         if (level > 100){

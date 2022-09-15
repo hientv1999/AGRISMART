@@ -51,7 +51,10 @@ bool turnOnWiFi(char sensorName[], bool OLED){
 bool sendDataLAMP(const char* serverName, const char* sensorName, const char* sensorLocation, const char* api_key, const String dataName[], const String dataValue[], const unsigned int sizeArray){
     if(WiFi.status()== WL_CONNECTED){
         HTTPClient http;
-        http.begin(serverName);
+        if (!http.begin(serverName)){
+            Serial.printf("http failed");
+            return false;
+        }
         http.addHeader("Content-Type", "application/x-www-form-urlencoded");
         String httpRequestData = "api_key=" + String(api_key) + "&sensor=" + String(sensorName) + "&location=" + String(sensorLocation);
         for (unsigned int i = 0; i < sizeArray; i++){
