@@ -54,7 +54,6 @@ void IRAM_ATTR cycleOLED(){
   touchDetect = true;
 }
 
-
 uint64_t Update(String serverName, char sensorName[], char sensorLocation[]){
   const char apiKeyValue[] = "TemperatureHumidity";
   uint64_t sinceLastUpdate = getTime() - lastUpdate;
@@ -93,7 +92,7 @@ void setup()
   Serial.begin(115200);
   Serial.println("Wake up");
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0){  // USB is plugged/unplugged
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1){  // USB is plugged/unplugged
     Serial.println("USB Type-C state changes");
     turnOnOLED();
     float CC_volt = ReadVoltageAnalogPin(CC);
@@ -115,8 +114,8 @@ void setup()
     }
     turnOffOLED();
     if (charging_plug){
-      esp_sleep_enable_ext0_wakeup(GPIO_NUM_39, 0);
-      esp_sleep_enable_timer_wakeup(0xFFFFFFFFFFFFFFFF);    // sleep for infinite
+      esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK, ESP_EXT1_WAKEUP_ANY_HIGH);
+      esp_sleep_enable_timer_wakeup(1000000*36000);    // sleep for 10 hours (should be more than enough to fully charge battery)
       touchAttachInterrupt(TOUCH, TSR, threshold_touch);
       esp_sleep_enable_touchpad_wakeup();
       
@@ -147,7 +146,7 @@ void setup()
     ADS1115_alive = turnOnADC();
     if (setupOption(true)){
       //fast setup
-      while (!fastSetup(ssid, pass, IP, sensorName, sensorLocation)){
+      while (!fastSetup(ssid, pass, IP, sensorName, sensorLocation, gmtOffset_sec)){
         delay(500);
         if (!setupOption(false)){//if switch to manual setup
           // show instructions for manual setup
@@ -162,7 +161,6 @@ void setup()
           }
           strcpy(sensorLocation, askForSensorLocation().c_str());
           gmtOffset_sec = askForOffset();
-          saveOffset(gmtOffset_sec);
         }
       }
     } else {
@@ -178,23 +176,17 @@ void setup()
       }
       strcpy(sensorLocation, askForSensorLocation().c_str());
       gmtOffset_sec = askForOffset();
-      saveOffset(gmtOffset_sec);
     }
-    printlnClearOLED("Finish Fast Setup", WHITE, 1);
-    delay(1000);
     saveSSID(ssid, strlen(ssid));
     savePassword(pass, strlen(pass));
     saveIP(IP, strlen(IP));
     saveSensorName(sensorName, strlen(sensorName));
     saveSensorLocation(sensorLocation, strlen(sensorLocation));
-    printlnClearOLED("Finish Saving", WHITE, 1);
-    delay(1000);
+    saveOffset(gmtOffset_sec);
     // force device to update to server to obtain local timezone
     lastUpdate = getTime() - TIME_TO_UPDATE_IN_SEC;
     serverName = "http://" + String(IP) + "/user/gardening/Agrismart/post_data.php";
     turnOffBLE();
-    printlnClearOLED("BLE off", WHITE, 1);
-    delay(1000);
     turnOnWiFi(sensorName, true);
     printlnClearOLED("Setup done", WHITE, 1);
     unsigned int start_finish = millis();
@@ -205,6 +197,7 @@ void setup()
     switch(wakeup_reason){
     case ESP_SLEEP_WAKEUP_TOUCHPAD : //touch pad
       {
+        Serial.println("wake up due to touch pad");
         digitalWrite(HAPTIC, HIGH);
         delay(10);
         digitalWrite(HAPTIC, LOW);
@@ -245,14 +238,20 @@ void setup()
               } else {
                 charging_plug= false;
               }
+              float CC_volt = ReadVoltageAnalogPin(CC);
               CC_volt = ReadVoltageAnalogPin(CC);
               if (CC_volt - 0.33 > 0 && CC_volt - 0.86 < 0){  // USB cable not supply enough current
                 digitalWrite(DISABLE_CHARGE, HIGH);
                 displayWarningPlug();
                 Serial.println("Not enough current");
-              } else {                                        // enough current or no connection
+              } else if (CC_volt - 0.86 > 0){                 // enough current
                 digitalWrite(DISABLE_CHARGE, LOW);
-                displayPlugInUSB_C(charging_plug);
+                Serial.println("Start charging");
+                displayPlugInUSB_C(true);
+              } else {                                        // unplug cable
+                digitalWrite(DISABLE_CHARGE, LOW);
+                Serial.println("Stop charging");
+                displayPlugInUSB_C(false);
               }
             }
             // normal screen
@@ -351,6 +350,7 @@ void setup()
     break;
     
     case ESP_SLEEP_WAKEUP_TIMER : //timer
+      Serial.println("wake up due to timer");
       strcpy(sensorName, retrieveSensorName().c_str());
       turnOnWiFi(sensorName, false);
       //turn sensors on
@@ -361,7 +361,7 @@ void setup()
       serverName = "http://" + String(IP) + "/user/gardening/Agrismart/post_data.php";
     break;
     
-    case ESP_SLEEP_WAKEUP_EXT0:
+    case ESP_SLEEP_WAKEUP_EXT1:
     break;
 
     default:  // wakeup by reset
@@ -396,18 +396,20 @@ void setup()
       break;
     }
   }
-  if (wakeup_reason != ESP_SLEEP_WAKEUP_EXT0){
+  if (digitalRead(USB_PLUG) == HIGH){
     if (String(IP) != "no server" && AHT10_alive && VL53L0X_alive && ADS1115_alive){
       time_sleep_left = Update(serverName, sensorName, sensorLocation);
     } else {
       time_sleep_left = TIME_TO_UPDATE_IN_SEC;
     }
+  } else {
+    time_sleep_left = 1000000*36000;
   }
   // WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 1); //enable brownout detector
   esp_sleep_enable_timer_wakeup(time_sleep_left*1000000-8000000); 
   touchAttachInterrupt(TOUCH, TSR, threshold_touch);
   esp_sleep_enable_touchpad_wakeup();
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_39, 1);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK, ESP_EXT1_WAKEUP_ALL_LOW);
   digitalWrite(ERROR, LOW);
   Serial.println("Sleep now");
   Serial.flush();

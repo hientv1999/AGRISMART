@@ -37,11 +37,11 @@ void turnOnBLE(std::string sensorName){
     NimBLEDevice::startAdvertising();
     Serial.println("Characteristic defined! Now you can read it in your phone!");
 }
-bool fastSetup(char (&wifiName)[32], char (&password)[63], char (&ip)[15], char (&name)[32], char (&location)[32]){
+bool fastSetup(char (&wifiName)[32], char (&password)[63], char (&ip)[15], char (&name)[32], char (&location)[32], long &gmtOffset_sec){
     printlnClearOLED(processText("Access website to fast setup Agrismart Tap to abort").c_str(), WHITE, 1);
     std::string OTP = "";
     std::string final_OTP = "";
-    while (OTP != "validate"){
+    while (OTP != "validate"){  //wait for "validate" message
         //get OTP
         final_OTP = OTP;
         OTP  = pCharacteristic -> getValue();
@@ -56,51 +56,61 @@ bool fastSetup(char (&wifiName)[32], char (&password)[63], char (&ip)[15], char 
         pCharacteristic -> setValue("");
         
     }
-    //wait for "validate" message
+    Serial.println("Received OTP and 'validate' message");
     pCharacteristic2 -> setValue(final_OTP);
     //get SSID
     std::string ssid  = pCharacteristic -> getValue();
-    printlnClearOLED("Loading", WHITE, 1);
-    Serial.println("debug1");
+    printClearOLED("Loading", WHITE, 1);
     while (ssid.length() <=1){
       ssid  = pCharacteristic -> getValue();
     }
+    Serial.println("Received SSID");
+    printOLED(".", WHITE, 1);
     pCharacteristic -> setValue("");
     pCharacteristic2 -> setValue("");
-    Serial.println("debug1a");
     //get Pass
     std::string pass  = pCharacteristic -> getValue();
     while (pass.length() <=1){
       pass  = pCharacteristic -> getValue();
     }
-    Serial.println("debug1b");
+    Serial.println("Received Pass");
+    printOLED(".", WHITE, 1);
     pCharacteristic -> setValue("");
     //get Location
     std::string loc  = pCharacteristic -> getValue();
     while (loc.length() <=1){
       loc  = pCharacteristic -> getValue();
     }
-    Serial.println("debug1c");
+    Serial.println("Received location");
+    printOLED(".", WHITE, 1);
     pCharacteristic -> setValue("");
     //get sensor name
     std::string sensorName  = pCharacteristic -> getValue();
     while (sensorName.length() <=1){
       sensorName  = pCharacteristic -> getValue();
     }
-    Serial.println("debug1d");
+    Serial.println("Received sensor name");
+    printOLED(".", WHITE, 1);
     pCharacteristic -> setValue("");
     //get IP
     std::string IP  = pCharacteristic -> getValue();
     while (IP.length() <=1){
       IP  = pCharacteristic -> getValue();
     }
-    Serial.println("debug1e");
+    Serial.println("Received IP");
+    printOLED(".", WHITE, 1);
     pCharacteristic -> setValue("");
-    Serial.println("debug2");
+    //get Offset
+    std::string data  = pCharacteristic -> getValue();
+    while (data.length() <=1){
+      data  = pCharacteristic -> getValue();
+    }
+    Serial.println("Received offset");
+    printOLED(".", WHITE, 1);
+    pCharacteristic -> setValue("");
     //check WiFi connection
     WiFi.disconnect(true);
     WiFi.begin(ssid.c_str(), pass.c_str());
-    Serial.println("debug3");
     std::string return_msg = "Setup success";
     int i = 0;
     unsigned int start = millis();
@@ -113,29 +123,33 @@ bool fastSetup(char (&wifiName)[32], char (&password)[63], char (&ip)[15], char 
             i = 0;
         }
         if (millis() - start >= 10000){
-            printClearOLED(processText("Fail to connect to WiFi, please choose a different WiFi via manual setup").c_str(), WHITE, 1);
+            printClearOLED(processText("Fail to connect to WiFi, please move closer to the WiFi router").c_str(), WHITE, 1);
             delay(5000);
             return_msg = "Setup fail";
             break;
         }
     }
-    //get Offset
-    // data  = pCharacteristic -> getValue();
-    // while (data.length() <=1){
-    //   data  = pCharacteristic -> getValue();
-    // }
-    // strcpy(tz, data.c_str());
-    // pCharacteristic -> setValue("");
-
     // return message about WiFi connection
     pCharacteristic2 -> setValue(return_msg);
     if (return_msg == "Setup success"){
+        printClearOLED("Saving", WHITE, 1);
         strcpy(wifiName, ssid.c_str());
+        printOLED(".", WHITE, 1);
         strcpy(password, pass.c_str());
+        printOLED(".", WHITE, 1);
         strcpy(location, loc.c_str());
+        printOLED(".", WHITE, 1);
         strcpy(name, sensorName.c_str());
+        printOLED(".", WHITE, 1);
         strcpy(ip, IP.c_str());
-        printlnClearOLED("Saving", WHITE, 1);
+        printOLED(".", WHITE, 1);
+        const char* offset = data.c_str();
+        if (offset[0] == '-'){
+            gmtOffset_sec = atoi(&offset[1]) * -1;
+        } else {
+            gmtOffset_sec = atoi(offset);
+        }
+        printOLED(".", WHITE, 1);
     } else {
         return false;
     }
