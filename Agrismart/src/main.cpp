@@ -92,38 +92,6 @@ void setup()
   Serial.begin(115200);
   Serial.println("Wake up");
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1){  // USB is plugged/unplugged
-    Serial.println("USB Type-C state changes");
-    turnOnOLED();
-    float CC_volt = ReadVoltageAnalogPin(CC);
-    if (CC_volt - 0.33 > 0 && CC_volt - 0.86 < 0){  // USB cable not supply enough current
-      charging_plug = true;
-      digitalWrite(DISABLE_CHARGE, HIGH);
-      displayWarningPlug();
-      Serial.println("Not enough current");
-    } else if (CC_volt - 0.86 > 0){                 // enough current
-      charging_plug = true;
-      digitalWrite(DISABLE_CHARGE, LOW);
-      Serial.println("Start charging");
-      displayPlugInUSB_C(true);
-    } else {                                        // unplug cable
-      charging_plug = false;
-      digitalWrite(DISABLE_CHARGE, LOW);
-      Serial.println("Stop charging");
-      displayPlugInUSB_C(false);
-    }
-    turnOffOLED();
-    if (charging_plug){
-      esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK, ESP_EXT1_WAKEUP_ANY_HIGH);
-      esp_sleep_enable_timer_wakeup(1000000*36000);    // sleep for 10 hours (should be more than enough to fully charge battery)
-      touchAttachInterrupt(TOUCH, TSR, threshold_touch);
-      esp_sleep_enable_touchpad_wakeup();
-      
-      Serial.println("Charge sleep now");
-      Serial.flush();
-      esp_deep_sleep_start(); 
-    }
-  } 
   EEPROM.begin(EEPROM_SIZE_TO_ACCESS);
   uint64_t time_sleep_left = TIME_TO_UPDATE_IN_SEC;
   char ssid[32] ={};
@@ -136,6 +104,7 @@ void setup()
   bool AHT10_alive = false;
   bool VL53L0X_alive = false;
   bool ADS1115_alive = false;
+  float USB_PLUG_volt;
   if (FirstSetup() == 0){                 // first time setup
     // turn on OLED, display welcome screen, turn on sensor, turn on BLE
     turnOnOLED();
@@ -199,7 +168,7 @@ void setup()
       {
         Serial.println("wake up due to touch pad");
         digitalWrite(HAPTIC, HIGH);
-        delay(10);
+        delay(100);
         digitalWrite(HAPTIC, LOW);
         // read SOLAR_VOLT < 1V then pull NIGHT_LIGHT high, at the end pull NIGHT_LIGHT low
         if (turnOnOLED()){
@@ -224,22 +193,23 @@ void setup()
           touchAttachInterrupt(TOUCH, cycleOLED , threshold_touch);
           touchDetect = false;
           togglePlug = false;
-          float CC_volt;
-          float USB_PLUG_volt;
           unsigned long lastPressOLED = millis();
           unsigned long lastTouch = millis();
           bool toggleScreen = false;
           while (millis() - lastPressOLED <= 15000){ //cycle through display mode
             // USB screen if plug/unplug
             USB_PLUG_volt = ReadVoltageAnalogPin(USB_PLUG);
-            if ((USB_PLUG_volt > 2 && charging_plug == false) || (USB_PLUG_volt < 2 && charging_plug == true)){
-              if (USB_PLUG_volt > 2){
-                charging_plug = true;
-              } else {
-                charging_plug= false;
-              }
+            if (USB_PLUG_volt >= 2 && charging_plug == true){  // unplug
+              charging_plug = false;
+              digitalWrite(DISABLE_CHARGE, LOW);
+              Serial.println("No charging");
+              displayPlugInUSB_C(false);
+            }
+            if (USB_PLUG_volt < 2 && charging_plug == false){ // plug
+              charging_plug = true;
               float CC_volt = ReadVoltageAnalogPin(CC);
-              CC_volt = ReadVoltageAnalogPin(CC);
+              Serial.print("CC volt: ");
+              Serial.println(CC_volt, 2);
               if (CC_volt - 0.33 > 0 && CC_volt - 0.86 < 0){  // USB cable not supply enough current
                 digitalWrite(DISABLE_CHARGE, HIGH);
                 displayWarningPlug();
@@ -250,8 +220,8 @@ void setup()
                 displayPlugInUSB_C(true);
               } else {                                        // unplug cable
                 digitalWrite(DISABLE_CHARGE, LOW);
-                Serial.println("Stop charging");
-                displayPlugInUSB_C(false);
+                Serial.println("No charging");
+                displayPlugInUSB_C(true);
               }
             }
             // normal screen
@@ -362,6 +332,40 @@ void setup()
     break;
     
     case ESP_SLEEP_WAKEUP_EXT1:
+      Serial.println("USB Type-C state changes");
+      digitalWrite(HAPTIC, HIGH);
+      delay(100);
+      digitalWrite(HAPTIC, LOW);
+      if (turnOnOLED()){
+        // USB screen if plug/unplug
+        USB_PLUG_volt = ReadVoltageAnalogPin(USB_PLUG);
+        if (USB_PLUG_volt >= 2 && charging_plug == true){  // unplug
+          charging_plug = false;
+          digitalWrite(DISABLE_CHARGE, LOW);
+          Serial.println("No charging");
+          displayPlugInUSB_C(false);
+        }
+        if (USB_PLUG_volt < 2 && charging_plug == false){ // plug
+          charging_plug = true;
+          float CC_volt = ReadVoltageAnalogPin(CC);
+          Serial.print("CC volt: ");
+          Serial.println(CC_volt, 2);
+          if (CC_volt - 0.33 > 0 && CC_volt - 0.86 < 0){  // USB cable not supply enough current
+            digitalWrite(DISABLE_CHARGE, HIGH);
+            displayWarningPlug();
+            Serial.println("Not enough current");
+          } else if (CC_volt - 0.86 > 0){                 // enough current
+            digitalWrite(DISABLE_CHARGE, LOW);
+            Serial.println("Start charging");
+            displayPlugInUSB_C(true);
+          } else {                                        // unplug cable
+            digitalWrite(DISABLE_CHARGE, LOW);
+            Serial.println("No charging");
+            displayPlugInUSB_C(true);
+          }
+        }
+        turnOffOLED();
+      }
     break;
 
     default:  // wakeup by reset
@@ -396,23 +400,29 @@ void setup()
       break;
     }
   }
-  if (digitalRead(USB_PLUG) == HIGH){
+  if (!charging_plug){
     if (String(IP) != "no server" && AHT10_alive && VL53L0X_alive && ADS1115_alive){
       time_sleep_left = Update(serverName, sensorName, sensorLocation);
     } else {
       time_sleep_left = TIME_TO_UPDATE_IN_SEC;
     }
+    esp_sleep_enable_timer_wakeup(time_sleep_left*1000000-8000000); 
+    touchAttachInterrupt(TOUCH, TSR, threshold_touch);
+    esp_sleep_enable_touchpad_wakeup();
+    esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK, ESP_EXT1_WAKEUP_ALL_LOW);
+    
+    Serial.println("Sleep now");
+    Serial.flush();
   } else {
-    time_sleep_left = 1000000*36000;
+    esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK, ESP_EXT1_WAKEUP_ANY_HIGH);
+    esp_sleep_enable_timer_wakeup(1000000*36000);    // sleep for 10 hours (should be more than enough to fully charge battery)
+    touchAttachInterrupt(TOUCH, TSR, threshold_touch);
+    esp_sleep_enable_touchpad_wakeup();
+    Serial.println("Charge sleep now");
+    Serial.flush();
   }
   // WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 1); //enable brownout detector
-  esp_sleep_enable_timer_wakeup(time_sleep_left*1000000-8000000); 
-  touchAttachInterrupt(TOUCH, TSR, threshold_touch);
-  esp_sleep_enable_touchpad_wakeup();
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK, ESP_EXT1_WAKEUP_ALL_LOW);
   digitalWrite(ERROR, LOW);
-  Serial.println("Sleep now");
-  Serial.flush();
   esp_deep_sleep_start();
 }
 void loop(){}
