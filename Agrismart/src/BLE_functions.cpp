@@ -134,12 +134,16 @@ bool fastSetup(char (&wifiName)[32], char (&password)[63], char (&ip)[15], char 
     if (return_msg == "Setup success"){
         printClearOLED("Saving", WHITE, 1);
         strcpy(wifiName, ssid.c_str());
+        saveSSID(wifiName, strlen(wifiName));
         printOLED(".", WHITE, 1);
         strcpy(password, pass.c_str());
+        savePassword(password, strlen(password));
         printOLED(".", WHITE, 1);
         strcpy(location, loc.c_str());
+        saveSensorLocation(location, strlen(location));
         printOLED(".", WHITE, 1);
         strcpy(name, sensorName.c_str());
+        saveSensorName(name, strlen(name));
         printOLED(".", WHITE, 1);
         strcpy(ip, IP.c_str());
         printOLED(".", WHITE, 1);

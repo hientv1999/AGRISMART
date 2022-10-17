@@ -158,7 +158,6 @@ void setup()
     }
     
     saveIP(IP, strlen(IP));
-    
     saveOffset(gmtOffset_sec);
     // force device to update to server to obtain local timezone
     lastUpdate = getTime() - TIME_TO_UPDATE_IN_SEC;
