@@ -29,6 +29,7 @@ Location table:
 */
 unsigned int FirstSetup();
 void FinishSetup();
+void selfTestEEPROM();
 void saveSSID(const char text[], int length);
 void savePassword(const char text[], int length);
 void saveIP(const char text[], int length);

@@ -122,13 +122,18 @@ void setup()
           instructionToLightBlue();
           // ask for SensorName -> SSID -> Pass -> IP -> Sensor Location 
           strcpy(sensorName, askForSensorName().c_str());
+          saveSensorName(sensorName, strlen(sensorName));
+          strcpy(sensorLocation, askForSensorLocation().c_str());
+          saveSensorLocation(sensorLocation, strlen(sensorLocation));
           bool WiFi_connection = false;
           while (!WiFi_connection){
             strcpy(ssid, askForSSID().c_str());
             strcpy(pass, askForPass().c_str());
+            saveSSID(ssid, strlen(ssid));
+            savePassword(pass, strlen(pass));
             WiFi_connection = turnOnWiFi(sensorName, true); 
           }
-          strcpy(sensorLocation, askForSensorLocation().c_str());
+          strcpy(IP, askForIP().c_str());
           gmtOffset_sec = askForOffset();
         }
       }
@@ -137,26 +142,28 @@ void setup()
       instructionToLightBlue();
       // ask for SensorName -> SSID -> Pass -> IP -> Sensor Location 
       strcpy(sensorName, askForSensorName().c_str());
+      saveSensorName(sensorName, strlen(sensorName));
+      strcpy(sensorLocation, askForSensorLocation().c_str());
+      saveSensorLocation(sensorLocation, strlen(sensorLocation));
       bool WiFi_connection = false;
       while (!WiFi_connection){
         strcpy(ssid, askForSSID().c_str());
         strcpy(pass, askForPass().c_str());
+        saveSSID(ssid, strlen(ssid));
+        savePassword(pass, strlen(pass));
         WiFi_connection = turnOnWiFi(sensorName, true); 
       }
-      strcpy(sensorLocation, askForSensorLocation().c_str());
+      strcpy(IP, askForIP().c_str());
       gmtOffset_sec = askForOffset();
     }
-    saveSSID(ssid, strlen(ssid));
-    savePassword(pass, strlen(pass));
+    
     saveIP(IP, strlen(IP));
-    saveSensorName(sensorName, strlen(sensorName));
-    saveSensorLocation(sensorLocation, strlen(sensorLocation));
+    
     saveOffset(gmtOffset_sec);
     // force device to update to server to obtain local timezone
     lastUpdate = getTime() - TIME_TO_UPDATE_IN_SEC;
     serverName = "http://" + String(IP) + "/user/gardening/Agrismart/post_data.php";
     turnOffBLE();
-    turnOnWiFi(sensorName, true);
     printlnClearOLED("Setup done", WHITE, 1);
     unsigned int start_finish = millis();
     while (millis() - start_finish < 2500);
@@ -173,6 +180,7 @@ void setup()
         // read SOLAR_VOLT < 1V then pull NIGHT_LIGHT high, at the end pull NIGHT_LIGHT low
         if (turnOnOLED()){
           displayTurnOnAnimation();
+          selfTestEEPROM();
           strcpy(sensorName, retrieveSensorName().c_str());
           strcpy(IP, retrieveIP(sensorName).c_str());
           turnOnWiFi(sensorName, true);
@@ -372,7 +380,6 @@ void setup()
         if (turnOnOLED()){
           welcomeScreen();
           strcpy(sensorName, retrieveSensorName().c_str());
-          turnOnWiFi(sensorName, true);
           if (getTouchValue(TOUCH) < threshold_touch){
             // factory reset code
             unsigned int origin = millis();
@@ -383,18 +390,23 @@ void setup()
               }
             }
             if (factory_reset){
-              strcpy(IP, retrieveIP(sensorName).c_str());
-              strcpy(sensorLocation, retrieveSensorLocation(sensorName).c_str());
-              serverName = "http://" + String(IP) + "/user/gardening/Agrismart/deleteTable.php";
-              if (deleteTable(serverName, sensorName, sensorLocation)){
+              if (EEPROM.read(3) != 0){
                 factoryReset(false);
               } else {
-                if (ManualFactoryReset()){
-                  factoryReset(true);
+                strcpy(IP, retrieveIP(sensorName).c_str());
+                strcpy(sensorLocation, retrieveSensorLocation(sensorName).c_str());
+                serverName = "http://" + String(IP) + "/user/gardening/Agrismart/deleteTable.php";
+                if (turnOnWiFi(sensorName, true) && deleteTable(serverName, sensorName, sensorLocation)){
+                  factoryReset(false);
+                } else {
+                  if (ManualFactoryReset()){
+                    factoryReset(true);
+                  }
                 }
               }
             }
           }
+          
           time_sleep_left = TIME_TO_UPDATE_IN_SEC;
         }
       break;

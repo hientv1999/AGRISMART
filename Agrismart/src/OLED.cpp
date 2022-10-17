@@ -434,7 +434,7 @@ void displayOverview(bool AHT10_alive, bool VL53L0X_alive, bool ADS1115_alive){
         } else {
             display.fillRect(1,1,12*batteryLevel/100,8, WHITE);
         }
-        display.setCursor(16, 2);
+        display.setCursor(18, 2);
         display.print(String(batteryLevel) + "%");
     } else {
         display.setCursor(20, 2);

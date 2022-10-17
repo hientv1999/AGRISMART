@@ -61,7 +61,6 @@ float getBatteryVoltage(){
             sum += value;
         }
     }
-
     if (zero_count == 10){
         return 0;
     } else {
@@ -70,7 +69,7 @@ float getBatteryVoltage(){
 }
 
 unsigned int getBatteryLevel(){
-    float batteryVolt = 11*readExternalADC(1);
+    float batteryVolt = getBatteryVoltage();
     if (batteryVolt - 3.38 > 0){        // 100%
         return 100;
     } else if (batteryVolt - 3.35 > 0){ // 90% - 99%
@@ -101,7 +100,24 @@ unsigned int getBatteryLevel(){
 }
 
 float solarVoltage(){
-    return 11*readExternalADC(3);
+    ads.setGain(GAIN_FOUR);
+    float sum = 0;
+    int zero_count = 0;
+    float value;
+    for (int i=0; i<10; i++){
+        value = ads.computeVolts(ads.readADC_SingleEnded(3));
+        if (abs(value) < 0.0020000001){
+            zero_count++;
+        } else {
+            sum += value;
+        }
+    }
+    ads.setGain(GAIN_EIGHT);
+    if (zero_count == 10){
+        return 0;
+    } else {
+        return 11*sum/(10-zero_count);
+    }
 }
 
 float chargingCurrent(){      // in mA

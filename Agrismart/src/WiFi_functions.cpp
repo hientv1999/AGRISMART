@@ -46,6 +46,7 @@ bool turnOnWiFi(char sensorName[], bool OLED){
             return false;
         }
     }
+    Serial.println("WiFi connected");
     return true;
 }
 bool sendDataLAMP(const char* serverName, const char* sensorName, const char* sensorLocation, const char* api_key, const String dataName[], const String dataValue[], const unsigned int sizeArray){

@@ -18,6 +18,15 @@ void FinishSetup(){
    EEPROM.commit();
 }
 
+void selfTestEEPROM(){
+    if (EEPROM.read(1) >32 || EEPROM.read(2) > 63 || EEPROM.read(3) > 15 || EEPROM.read(4) > 32 || EEPROM.read(5) > 32){
+        printlnClearOLED(processText("Corrupted storage. Please factory reset").c_str(), WHITE, 1);
+        Serial.println("Corrupted EEPROM");
+        ESP.restart();
+    } else {
+        Serial.println("EEPROM OK");
+    }
+}
 void saveSSID(const char text[], int length){
     for (int i = 0; i < length; i++){
         EEPROM.write(10+i, text[i]);
