@@ -18,6 +18,7 @@ bool turnOnADC(bool display_text){
         Serial.println("ADS1115 failed");
         return false;
     }
+    // ads.setDataRate(0x00E0);
     ads.setGain(GAIN_EIGHT);    // use this gain for all power management
     Serial.println("ADS1115 OK");
     return true;
@@ -28,8 +29,48 @@ float ReadVoltageAnalogPin(int pin){
   return float(analogRead(pin))/4095*3.1+0.1;
 }
 
+float readExternalADC(uint8_t pin){
+    float sum = 0;
+    int zero_count = 0;
+    float value;
+    for (int i=0; i<10; i++){
+        value = ads.computeVolts(ads.readADC_SingleEnded(pin));
+        if (abs(value) < 0.00000000001){
+            zero_count++;
+        } else {
+            sum += value;
+        }
+    }
+    if (zero_count == 10){
+        return 0;
+    } else {
+        return sum/(10-zero_count);
+    }
+    
+}
+
+float getBatteryVoltage(){
+    float sum = 0;
+    int zero_count = 0;
+    float value;
+    for (int i=0; i<10; i++){
+        value = ads.computeVolts(ads.readADC_SingleEnded(1));
+        if (abs(value) < 0.0020000001){
+            zero_count++;
+        } else {
+            sum += value;
+        }
+    }
+
+    if (zero_count == 10){
+        return 0;
+    } else {
+        return 11*sum/(10-zero_count);
+    }
+}
+
 unsigned int getBatteryLevel(){
-    float batteryVolt = 11*ads.computeVolts(ads.readADC_SingleEnded(1));
+    float batteryVolt = 11*readExternalADC(1);
     if (batteryVolt - 3.38 > 0){        // 100%
         return 100;
     } else if (batteryVolt - 3.35 > 0){ // 90% - 99%
@@ -60,18 +101,16 @@ unsigned int getBatteryLevel(){
 }
 
 float solarVoltage(){
-    float batteryVolt = 11*ads.computeVolts(ads.readADC_SingleEnded(3));
-    return batteryVolt;
+    return 11*readExternalADC(3);
 }
 
 float chargingCurrent(){      // in mA
-    float batteryCurrent = ads.computeVolts(ads.readADC_SingleEnded(0))/0.015*1000; // positive mean charging
-    return batteryCurrent;
+    return readExternalADC(0)/0.015*1000; // positive mean charging
 }
 
 float chargingPower(){      // positive mean charging
-    float batteryVolt = 11*ads.computeVolts(ads.readADC_SingleEnded(1));
-    float batteryCurrent = ads.computeVolts(ads.readADC_SingleEnded(0))/0.015;
+    float batteryVolt = 11*readExternalADC(1);
+    float batteryCurrent = readExternalADC(0)/0.015;
     return batteryVolt*batteryCurrent;
 }
 

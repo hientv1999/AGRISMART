@@ -26,7 +26,11 @@ String getTemperature(bool AHT10_alive){
    if (!AHT10_alive){
       return "?? ";
    } else {
-      String temperature = String(myAHT10.readTemperature(), 2);
+      float sum = 0;
+      for (int i=0; i<3; i++){
+         sum += myAHT10.readTemperature();
+      }
+      String temperature = String(sum/3, 2);
       return temperature;
    }
 }
@@ -34,7 +38,11 @@ String getHumidity(bool AHT10_alive){
    if (!AHT10_alive){
       return "?? ";
    } else {
-      String humidity = String(myAHT10.readHumidity(), 2);
+      float sum = 0;
+      for (int i=0; i<3; i++){
+         sum += myAHT10.readHumidity();
+      }
+      String humidity = String(sum/3, 2);
       return humidity;
    }
    

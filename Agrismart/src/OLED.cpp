@@ -434,7 +434,7 @@ void displayOverview(bool AHT10_alive, bool VL53L0X_alive, bool ADS1115_alive){
         } else {
             display.fillRect(1,1,12*batteryLevel/100,8, WHITE);
         }
-        display.setCursor(20, 2);
+        display.setCursor(16, 2);
         display.print(String(batteryLevel) + "%");
     } else {
         display.setCursor(20, 2);
@@ -443,7 +443,7 @@ void displayOverview(bool AHT10_alive, bool VL53L0X_alive, bool ADS1115_alive){
     //Time
     struct tm timeinfo;
     if (getLocalTime(&timeinfo)){
-        display.setCursor(40, 2);
+        display.setCursor(44, 2);
         if (timeinfo.tm_hour < 10){
             display.print("0");
         }
@@ -480,23 +480,23 @@ void displayOverview(bool AHT10_alive, bool VL53L0X_alive, bool ADS1115_alive){
     display.drawFastVLine(0, 12, 20, WHITE);
     display.drawFastVLine(127, 12, 20, WHITE);
     display.setCursor(2, 14);
-    display.print(getTemperature(AHT10_alive) + char(247) + "C");
+    display.print(getTemperature(AHT10_alive) + char(247) + "C");   //top left
     display.setCursor(2, 24);
-    display.print(getHumidity(AHT10_alive) + "%");
-    display.setCursor(46, 14);
-    display.print(waterLevelPercentage(VL53L0X_alive) + "%");
+    display.print(getHumidity(AHT10_alive) + "%");                  // bottom left
+    display.setCursor(46, 14);                                      
+    display.print(waterLevelPercentage(VL53L0X_alive) + "%");       // top mid
     if (ADS1115_alive){
         float chargePower = chargingPower();
-        if (chargingPower() > 0){
+        if (chargingPower() > 0){                                   
             display.setCursor(50, 24);
         } else {
             display.setCursor(46, 24);
         }
-        display.print(String(chargePower, 2) + "W");
-        display.setCursor(98, 14);
-        display.print(String(soilMoisture(), 2) + "W");
-        display.setCursor(98, 24);
-        display.print(String(solarVoltage(), 2) + "V");
+        display.print(String(chargePower, 2) + "W");                // bottom mid
+        display.setCursor(90, 14);
+        display.print(String(soilMoisture(), 1) + "%");             // top right
+        display.setCursor(90, 24);
+        display.print(String(solarVoltage(), 2) + "V");             // bottom right
     } else {
         display.setCursor(50, 24);
         display.print("?? W");
@@ -529,7 +529,7 @@ void displayTemperature(bool AHT10_alive){   // from -20C to 40C is proportional
         display.setTextColor(WHITE);
         display.setTextSize(2);
         display.setCursor(35, 16);
-        text = String(myAHT10.readTemperature(), 2) + char(247) + 'C';
+        text = getTemperature(true) + char(247) + 'C';
     } else {
         display.setTextColor(WHITE);
         display.setTextSize(2);
@@ -559,7 +559,7 @@ void displayHumidity(bool AHT10_alive){
     display.setCursor(45, 16);
     String text;
     if (AHT10_alive){
-        text = String(myAHT10.readHumidity(), 2) + '%';
+        text = getHumidity(true) + '%';
     } else {
         text = "???%";
     }
@@ -636,9 +636,13 @@ void displayBatteryLevel(bool ADS1115_alive){
         }
         display.setTextColor(WHITE);
         display.setTextSize(2);
-        display.setCursor(75, 10);
+        display.setCursor(75, 2);
         display.print(batteryLevel);
         display.print("%");
+        display.setTextSize(1);
+        display.setCursor(85, 20);
+        display.print(String(getBatteryVoltage(), 2));
+        display.print("V");
     } else {
         display.setTextColor(WHITE);
         display.setTextSize(2);

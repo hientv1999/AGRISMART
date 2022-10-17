@@ -54,6 +54,9 @@ float soilMoisture(){
     unsigned int moisture = ads.readADC_SingleEnded(2);
     ads.setGain(GAIN_EIGHT);  
     float moisture_level = moisture; // add the calibrated equation here
+    if (moisture_level - 100 > 0){
+        return 100;
+    }
     return moisture_level; 
 }
 
