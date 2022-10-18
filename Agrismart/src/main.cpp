@@ -54,13 +54,16 @@ void IRAM_ATTR cycleOLED(){
   touchDetect = true;
 }
 
-uint64_t Update(String serverName, char sensorName[], char sensorLocation[]){
+uint64_t Update(String serverName, char sensorName[], char sensorLocation[], bool sensorAvailability[]){
   const char apiKeyValue[] = "TemperatureHumidity";
   uint64_t sinceLastUpdate = getTime() - lastUpdate;
   uint64_t time_sleep_left = TIME_TO_UPDATE_IN_SEC - sinceLastUpdate;
   if (sinceLastUpdate >= TIME_TO_UPDATE_IN_SEC) { // if it is time to update-
     String dataName[NUM_OF_DATATYPE] = {"Temperature", "Humidity", "WaterLevel", "BatteryLevel", "ChargingCurrent", "Watering"};
-    String dataValue[NUM_OF_DATATYPE] = {String(getTemperature(true)), String(getHumidity(true)), String(waterLevelPercentage(true)), String(getBatteryLevel()), String(chargingCurrent()), "1"};
+    String dataValue[NUM_OF_DATATYPE] = {String(getTemperature(sensorAvailability[0])), String(getHumidity(sensorAvailability[0])), String(waterLevelPercentage(sensorAvailability[1])), String(getBatteryLevel()), String(chargingCurrent()), "1"};
+    if (dataValue[2] == "???"){
+      dataValue[2] = "-1";
+    }
     if (sendDataLAMP(serverName.c_str(), sensorName, sensorLocation, apiKeyValue, dataName, dataValue, NUM_OF_DATATYPE)){
       lastUpdate = getTime();
     } else {
@@ -412,8 +415,9 @@ void setup()
     }
   }
   if (!charging_plug){
-    if (String(IP) != "no server" && AHT10_alive && VL53L0X_alive && ADS1115_alive){
-      time_sleep_left = Update(serverName, sensorName, sensorLocation);
+    if (String(IP) != "no server"){
+      bool sensorAvailability[3] = {AHT10_alive, VL53L0X_alive, ADS1115_alive};
+      time_sleep_left = Update(serverName, sensorName, sensorLocation, sensorAvailability);
     } else {
       time_sleep_left = TIME_TO_UPDATE_IN_SEC;
     }
