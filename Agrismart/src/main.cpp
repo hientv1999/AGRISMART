@@ -381,6 +381,11 @@ void setup()
             displayPlugInUSB_C(true);
           }
         }
+        // display voltage level
+        ADS1115_alive = turnOnADC();
+        while (charging_plug && ReadVoltageAnalogPin(USB_PLUG) < 2){
+          displayBatteryLevel(ADS1115_alive);
+        }
         turnOffOLED();
       }
     break;
