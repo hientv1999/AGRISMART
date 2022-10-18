@@ -84,7 +84,6 @@ void printlnOLED(const char* text, const uint16_t color, const uint8_t size){
 }
 
 bool turnOnOLED(){
-    pinMode(BUTTON_OLED, OUTPUT);
     digitalWrite(BUTTON_OLED, HIGH);
     delay(100);
     unsigned int origin = millis();

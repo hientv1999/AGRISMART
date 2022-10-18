@@ -60,7 +60,13 @@ uint64_t Update(String serverName, char sensorName[], char sensorLocation[], boo
   uint64_t time_sleep_left = TIME_TO_UPDATE_IN_SEC - sinceLastUpdate;
   if (sinceLastUpdate >= TIME_TO_UPDATE_IN_SEC) { // if it is time to update-
     String dataName[NUM_OF_DATATYPE] = {"Temperature", "Humidity", "WaterLevel", "BatteryLevel", "ChargingCurrent", "Watering"};
-    String dataValue[NUM_OF_DATATYPE] = {String(getTemperature(sensorAvailability[0])), String(getHumidity(sensorAvailability[0])), String(waterLevelPercentage(sensorAvailability[1])), String(getBatteryLevel()), String(chargingCurrent()), "1"};
+    String dataValue[NUM_OF_DATATYPE] = {getTemperature(sensorAvailability[0]),getHumidity(sensorAvailability[0]), waterLevelPercentage(sensorAvailability[1]), String(getBatteryLevel()), String(chargingCurrent()), "1"};
+    if (dataValue[0] == "??"){
+      dataValue[0] = "-1";
+    }
+    if (dataValue[1] == "??"){
+      dataValue[1] = "-1";
+    }
     if (dataValue[2] == "???"){
       dataValue[2] = "-1";
     }
@@ -336,6 +342,7 @@ void setup()
       //turn sensors on
       AHT10_alive = turnOnTempHum(false);
       VL53L0X_alive = turnOnTOF(false);
+      ADS1115_alive = turnOnADC();
       strcpy(IP, retrieveIP(sensorName).c_str());
       strcpy(sensorLocation, retrieveSensorLocation(sensorName).c_str());
       serverName = "http://" + String(IP) + "/user/gardening/Agrismart/post_data.php";
