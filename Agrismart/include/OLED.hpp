@@ -9,6 +9,7 @@ void printClearOLED(const char* text, const uint16_t color, const uint8_t size);
 void printlnClearOLED(const char* text, const uint16_t color, const uint8_t size);
 void printOLED(const char* text, const uint16_t color, const uint8_t size);
 void printlnOLED(const char* text, const uint16_t color, const uint8_t size);
+void printSingleCenterOLED(const char* text, int16_t y, const uint16_t color, const uint8_t size);
 bool setupOption(bool firstTime);
 void instructionToLightBlue();
 void welcomeScreen();

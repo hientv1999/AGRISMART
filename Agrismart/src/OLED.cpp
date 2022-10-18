@@ -7,6 +7,7 @@
 #include "watering.hpp"
 #include "battery.hpp"
 #include "error.hpp"
+#include "EEPROM_functions.hpp"
 extern AHT10 myAHT10;
 extern unsigned int NUM_OF_DATATYPE;
 extern int BATT_LEVEL;
@@ -83,6 +84,19 @@ void printlnOLED(const char* text, const uint16_t color, const uint8_t size){
    display.display();
 }
 
+void printSingleCenterOLED(const char* text, int16_t y, const uint16_t color, const uint8_t size){
+    std::string string_text = text;
+    if (string_text.length() > 21){
+        string_text = string_text.substr(0,18);
+        string_text += "...";
+    }
+    int16_t x = 3*(21-string_text.length());
+    display.setTextColor(color);
+    display.setCursor(x, y);
+    display.setTextSize(size);
+    display.println(text);
+    display.display();
+}
 bool turnOnOLED(){
     digitalWrite(BUTTON_OLED, HIGH);
     delay(100);
@@ -462,12 +476,16 @@ void displayOverview(bool AHT10_alive, bool VL53L0X_alive, bool ADS1115_alive){
         display.drawFastHLine(97, 6, 12, WHITE);
     }
     // WiFi signal
-    int signal_strengh = WiFi.RSSI();
+    int signalStrength = 0;
+    for (int i=0; i<5; i++){
+        signalStrength += WiFi.RSSI();
+    }
+    signalStrength /= 5;
     display.drawFastVLine(116, 7, 3, WHITE);
-    if (signal_strengh > -75){
+    if (signalStrength > -75){
         display.drawFastVLine(118, 4, 6, WHITE);
     }
-    if (signal_strengh > -55){
+    if (signalStrength > -55){
         display.drawFastVLine(120, 1, 9, WHITE);
     }   
     // Information
@@ -480,9 +498,9 @@ void displayOverview(bool AHT10_alive, bool VL53L0X_alive, bool ADS1115_alive){
     display.drawFastVLine(127, 12, 20, WHITE);
     display.setCursor(2, 14);
     display.print(getTemperature(AHT10_alive) + char(247) + "C");   //top left
-    display.setCursor(2, 24);
+    display.setCursor(3, 24);
     display.print(getHumidity(AHT10_alive) + "%");                  // bottom left
-    display.setCursor(46, 14);                                      
+    display.setCursor(50, 14);                                      
     display.print(waterLevelPercentage(VL53L0X_alive) + "%");       // top mid
     if (ADS1115_alive){
         float chargePower = chargingPower();
@@ -492,9 +510,23 @@ void displayOverview(bool AHT10_alive, bool VL53L0X_alive, bool ADS1115_alive){
             display.setCursor(46, 24);
         }
         display.print(String(chargePower, 2) + "W");                // bottom mid
-        display.setCursor(90, 14);
-        display.print(String(soilMoisture(), 1) + "%");             // top right
-        display.setCursor(90, 24);
+        
+        float soil_moisture = soilMoisture();
+        if (soil_moisture <= 0){    // condition for no signal from soil moisture sensor
+            display.setCursor(96, 14);
+            display.print( "?? %"); 
+        } else if (soil_moisture < 10) {
+            display.setCursor(96, 14);
+            display.print(String(soilMoisture(), 1) + "%");
+        } else if (soil_moisture < 100){
+            display.setCursor(93, 14);
+            display.print(String(soilMoisture(), 1) + "%");
+        } else {
+            display.setCursor(90, 14);
+            display.print("100%");         // top right
+        }
+             
+        display.setCursor(92, 24);
         display.print(String(solarVoltage(), 2) + "V");             // bottom right
     } else {
         display.setCursor(50, 24);
@@ -591,15 +623,20 @@ void displayWaterLevel(bool VL53L0X_alive){
         }
         display.setTextColor(WHITE);
         display.setTextSize(2);
-        display.setCursor(60, 12);
+        display.setCursor(60, 0);
         display.print(level);
     } else {
         display.setTextColor(WHITE);
         display.setTextSize(2);
-        display.setCursor(60, 12);
+        display.setCursor(60, 0);
         display.print("???");
     }
     display.print("%");
+    display.setTextSize(1);
+    display.setCursor(56, 16);
+    display.print("Long press");
+    display.setCursor(50, 24);
+    display.print("to calibrate");
     display.display();
     
     
@@ -635,18 +672,28 @@ void displayBatteryLevel(bool ADS1115_alive){
         }
         display.setTextColor(WHITE);
         display.setTextSize(2);
-        display.setCursor(75, 2);
+        if (batteryLevel == 100){
+            display.setCursor(75, 4);
+        } else if (batteryLevel < 10){
+            display.setCursor(90, 4);
+        } else {
+            display.setCursor(82, 4);
+        }
+        
         display.print(batteryLevel);
         display.print("%");
         display.setTextSize(1);
-        display.setCursor(85, 20);
+        display.setCursor(85, 22);
         display.print(String(getBatteryVoltage(), 2));
         display.print("V");
     } else {
         display.setTextColor(WHITE);
         display.setTextSize(2);
-        display.setCursor(75, 10);
+        display.setCursor(75, 4);
         display.print("?? %");
+        display.setTextSize(1);
+        display.setCursor(85, 22);
+        display.print("?? V");
     }
     display.display();
 }
@@ -683,15 +730,23 @@ void displayWiFi(){
 	0x00, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x00, 0x00, 0x00, 0x00, 0x78, 
 	0x00, 0x00, 0x00, 0x00, 0x78, 0x00, 0x00, 0x00, 0x00, 0x30, 0x00, 0x00  };
     display.clearDisplay();
-    int signalStrength = WiFi.RSSI();
-    if (signalStrength > -55){
-        display.drawBitmap(45, 2, WiFiStrong, 38, 28, 1);
-    } else if (signalStrength < -75){
-        display.drawBitmap(45, 2, WiFiWeak, 38, 28, 1);
-    } else {
-        display.drawBitmap(45, 2, WiFiNormal, 38, 28, 1);
+    int signalStrength = 0;
+    for (int i=0; i<5; i++){
+        signalStrength += WiFi.RSSI();
     }
-    display.display();
+    signalStrength /= 5;
+    if (signalStrength > -55){
+        display.drawBitmap(45, -6, WiFiStrong, 38, 28, 1);
+    } else if (signalStrength < -75){
+        display.drawBitmap(45, -6, WiFiWeak, 38, 28, 1);
+    } else {
+        display.drawBitmap(45, -6, WiFiNormal, 38, 28, 1);
+    }
+    char sensorName[32] = {};
+    char wifiName[32] = {};
+    strcpy(sensorName, retrieveSensorName().c_str());
+    strcpy(wifiName,  retrieveSSID(sensorName).c_str());
+    printSingleCenterOLED(wifiName, 24, WHITE, 1);
 }
 
 bool ManualFactoryReset(){
