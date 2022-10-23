@@ -46,7 +46,6 @@ float readExternalADC(uint8_t pin){
     } else {
         return sum/(10-zero_count);
     }
-    
 }
 
 float getBatteryVoltage(){

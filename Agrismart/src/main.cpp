@@ -417,19 +417,18 @@ void setup()
       break;
     }
   }
-  if (String(IP) != "no server"){
-      bool sensorAvailability[3] = {AHT10_alive, VL53L0X_alive, ADS1115_alive};
-      time_sleep_left = Update(serverName, sensorName, sensorLocation, sensorAvailability);
-    } else {
-      time_sleep_left = TIME_TO_UPDATE_IN_SEC;
-    }
-    esp_sleep_enable_timer_wakeup(time_sleep_left*1000000-8000000); 
-    touchAttachInterrupt(TOUCH, TSR, threshold_touch);
-    esp_sleep_enable_touchpad_wakeup();
-    esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK, ESP_EXT1_WAKEUP_ALL_LOW);
-    
-    Serial.println("Sleep now");
-    Serial.flush();
+  if (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED && String(IP) != "no server"){
+    bool sensorAvailability[3] = {AHT10_alive, VL53L0X_alive, ADS1115_alive};
+    time_sleep_left = Update(serverName, sensorName, sensorLocation, sensorAvailability);
+  } else {
+    time_sleep_left = TIME_TO_UPDATE_IN_SEC;
+  }
+  esp_sleep_enable_timer_wakeup(time_sleep_left*1000000-8000000); 
+  touchAttachInterrupt(TOUCH, TSR, threshold_touch);
+  esp_sleep_enable_touchpad_wakeup();
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK, ESP_EXT1_WAKEUP_ALL_LOW);
+  Serial.println("Sleep now");
+  Serial.flush();
   // WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 1); //enable brownout detector
   digitalWrite(ERROR, LOW);
   esp_deep_sleep_start();
