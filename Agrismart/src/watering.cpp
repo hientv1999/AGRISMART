@@ -51,12 +51,15 @@ String waterLevelPercentage(bool VL53L0X_alive){
 
 float soilMoisture(){
     ads.setGain(GAIN_ONE);
+    delay(10);
     unsigned int moisture = readExternalADC(2);
     ads.setGain(GAIN_EIGHT);  
     float moisture_level = moisture; // add the calibrated equation here
+    Serial.println(moisture_level, 2);
     if (moisture_level - 100 > 0){
         return 100;
     }
+    
     return moisture_level; 
 }
 

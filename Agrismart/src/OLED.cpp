@@ -527,7 +527,7 @@ void displayOverview(bool AHT10_alive, bool VL53L0X_alive, bool ADS1115_alive){
         }
              
         display.setCursor(92, 24);
-        display.print(String(solarVoltage(), 2) + "V");             // bottom right
+        display.print(String(getsolarVoltage(), 2) + "V");             // bottom right
     } else {
         display.setCursor(50, 24);
         display.print("?? W");
@@ -686,6 +686,7 @@ void displayBatteryLevel(bool ADS1115_alive){
         display.setCursor(85, 22);
         display.print(String(getBatteryVoltage(), 2));
         display.print("V");
+
     } else {
         display.setTextColor(WHITE);
         display.setTextSize(2);

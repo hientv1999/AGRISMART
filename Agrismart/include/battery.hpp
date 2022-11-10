@@ -4,7 +4,7 @@ bool turnOnADC(bool display_text = true);
 float ReadVoltageAnalogPin(int pin);
 float readExternalADC(uint8_t pin);
 float getBatteryVoltage();
-float solarVoltage();
+float getsolarVoltage();
 float chargingCurrent();
 float chargingPower();
 bool batteryCharging();

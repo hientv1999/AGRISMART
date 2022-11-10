@@ -12,7 +12,8 @@
 #include "error.hpp"
 #define EEPROM_SIZE_TO_ACCESS 4096
 unsigned int NUM_OF_DATATYPE = 6; //air temperature - air humidity - water level - battery level - charging current - watering
-const uint64_t TIME_TO_UPDATE_IN_SEC = 300; //time between uploading data to LAMP server in second
+const uint16_t TIME_TO_UPDATE_IN_SEC = 300; //time between uploading data to LAMP server in second
+uint16_t TIME_TO_DISPLAY_IN_SEC = 30;
 #define I2C_SDA 25 
 #define I2C_SCL 26 
 #define BUTTON_PIN_BITMASK 0x8000000000 // 2^39 in hex
@@ -96,6 +97,7 @@ void setup()
   pinMode(DISABLE_CHARGE, OUTPUT);
   pinMode(BUTTON_OLED, OUTPUT);
   pinMode(NIGHT_LIGHT, OUTPUT);
+  pinMode(ENABLE_BOOST, OUTPUT);
   Wire1.begin(I2C_SDA, I2C_SCL, 100000); 
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
   Serial.begin(115200);
@@ -196,7 +198,7 @@ void setup()
           ADS1115_alive = turnOnADC();
 
           if (ADS1115_alive){
-            if (solarVoltage() - 1 < 0){
+            if (getsolarVoltage() - 1 < 0){
               digitalWrite(NIGHT_LIGHT, HIGH);
             }
           }
@@ -211,7 +213,7 @@ void setup()
           unsigned long lastPressOLED = millis();
           unsigned long lastTouch = millis();
           bool toggleScreen = false;
-          while (millis() - lastPressOLED <= 15000){ //cycle through display mode
+          while (millis() - lastPressOLED <= TIME_TO_DISPLAY_IN_SEC * 1000){ //cycle through display mode
             // normal screen
             switch (tap_num){
               case 0: //everything
@@ -316,6 +318,7 @@ void setup()
                 Serial.println("No charging");
                 displayPlugInUSB_C(true);
               }
+              digitalWrite(NIGHT_LIGHT, LOW);
               // display voltage level
               while (charging_plug && ReadVoltageAnalogPin(USB_PLUG) < 2){
                 displayBatteryLevel(ADS1115_alive);
@@ -417,12 +420,14 @@ void setup()
       break;
     }
   }
+  Serial.println("here");
   if (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED && String(IP) != "no server"){
     bool sensorAvailability[3] = {AHT10_alive, VL53L0X_alive, ADS1115_alive};
     time_sleep_left = Update(serverName, sensorName, sensorLocation, sensorAvailability);
   } else {
     time_sleep_left = TIME_TO_UPDATE_IN_SEC;
   }
+  Serial.println("here");
   esp_sleep_enable_timer_wakeup(time_sleep_left*1000000-8000000); 
   touchAttachInterrupt(TOUCH, TSR, threshold_touch);
   esp_sleep_enable_touchpad_wakeup();

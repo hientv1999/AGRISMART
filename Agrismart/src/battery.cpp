@@ -98,7 +98,7 @@ unsigned int getBatteryLevel(){
     }
 }
 
-float solarVoltage(){
+float getsolarVoltage(){
     ads.setGain(GAIN_FOUR);
     float sum = 0;
     int zero_count = 0;
